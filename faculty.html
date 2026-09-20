@@ -145,49 +145,54 @@
     <div class="card">
       <div class="card-header">
         <div>
-          <h3>Temporary Availability Overrides</h3>
+          <h3 id="override-form-title">Temporary Availability Overrides</h3>
           <div class="card-subtitle" style="margin-top: 0.25rem;">
-            Overrides take strict priority over your regular timetable (e.g. if a class is cancelled or you are on leave).
+            Overrides take strict priority over your regular timetable (e.g. if a class is cancelled, or you are on leave/symposium).
           </div>
         </div>
+        <span id="faculty-ov-duration-badge" style="font-size: 0.75rem; background: var(--border-color); padding: 0.2rem 0.5rem; border-radius: var(--radius-sm); font-weight: 500;">Duration: 1 hr</span>
       </div>
 
+      <!-- Live validation / collision preview box -->
+      <div id="faculty-ov-validation-alert" style="display: none; padding: 0.5rem 0.75rem; border-radius: var(--radius-sm); font-size: 0.8125rem; margin-bottom: 0.75rem;"></div>
+
       <!-- Override Creation Form -->
-      <form id="override-form" style="background: var(--surface-muted); padding: 1.25rem; border-radius: var(--radius-sm); margin-bottom: 1.5rem;">
+      <form id="override-form" style="background: var(--surface-muted); padding: 1.25rem; border-radius: var(--radius-sm); margin-bottom: 1.5rem; border: 1px solid var(--border-color);">
         <input type="hidden" id="override-edit-id" value="">
         
         <div class="form-row">
           <div class="form-group">
-            <label for="override-date">Date</label>
+            <label for="override-date">Target Date *</label>
             <input type="date" id="override-date" class="form-control" required>
           </div>
           <div class="form-group">
-            <label for="override-start-time">Start Time</label>
+            <label for="override-start-time">Start Time *</label>
             <input type="time" id="override-start-time" class="form-control" required value="10:00">
           </div>
           <div class="form-group">
-            <label for="override-end-time">End Time</label>
+            <label for="override-end-time">End Time *</label>
             <input type="time" id="override-end-time" class="form-control" required value="11:00">
           </div>
           <div class="form-group">
-            <label for="override-status">Override Status</label>
+            <label for="override-status">Override Status *</label>
             <select id="override-status" class="form-control">
               <option value="available">Available</option>
-              <option value="present">Present</option>
-              <option value="in_meeting">In Meeting</option>
-              <option value="unavailable">Unavailable</option>
+              <option value="present">Present in Cabin</option>
+              <option value="in_meeting">In Meeting / Conference</option>
+              <option value="unavailable">Unavailable / Leave</option>
+              <option value="in_class">Special Extra Class</option>
             </select>
           </div>
         </div>
 
         <div class="form-group">
-          <label for="override-note">Optional Note / Reason</label>
-          <input type="text" id="override-note" class="form-control" placeholder="e.g. Lecture cancelled; available in cabin for questions">
+          <label for="override-note">Optional Note / Reason for Students</label>
+          <input type="text" id="override-note" class="form-control" placeholder="e.g. Lecture cancelled; available in cabin for project doubts">
         </div>
 
-        <div style="display: flex; gap: 0.75rem; justify-content: flex-end;">
-          <button type="button" id="btn-cancel-override-edit" class="btn btn-secondary" style="display: none;">Cancel</button>
-          <button type="submit" id="btn-submit-override" class="btn btn-primary">Add Override</button>
+        <div style="display: flex; gap: 0.75rem; justify-content: flex-end; align-items: center;">
+          <button type="button" id="btn-cancel-override-edit" class="btn btn-secondary btn-sm" style="display: none;">Cancel</button>
+          <button type="submit" id="btn-submit-override" class="btn btn-primary btn-sm">Add Override</button>
         </div>
       </form>
 
@@ -199,8 +204,9 @@
               <th>Date</th>
               <th>Time Window</th>
               <th>Status</th>
+              <th>Timeline</th>
               <th>Note</th>
-              <th style="width: 130px;">Actions</th>
+              <th style="width: 140px;">Actions</th>
             </tr>
           </thead>
           <tbody id="overrides-table-body">
@@ -260,6 +266,7 @@
   <script src="js/auth.js"></script>
   <script src="js/faculty-service.js"></script>
   <script src="js/timetable-service.js"></script>
+  <script src="js/availability-service.js"></script>
   <script src="js/faculty.js"></script>
 </body>
 </html>

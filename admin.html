@@ -343,17 +343,24 @@
     </section>
 
     <!-- ========================================================== -->
-    <!-- SECTION 4: AVAILABILITY OVERVIEW -->
+    <!-- SECTION 4: AVAILABILITY OVERVIEW & OVERRIDES ENGINE -->
     <!-- ========================================================== -->
     <section id="section-availability" class="admin-section" style="display: none;">
       <div class="card">
         <div class="card-header">
           <div>
-            <h2>Current Faculty Status Overview</h2>
+            <h2>Faculty Status & Availability Management</h2>
             <div class="card-subtitle" style="margin-top: 0.25rem;">
-              Real-time snapshot of what students currently see for each faculty member.
+              Real-time snapshot of live faculty availability, manual status posts, and schedule override management.
             </div>
           </div>
+          <button id="btn-refresh-availability-admin" class="btn btn-secondary btn-sm">Refresh Status</button>
+        </div>
+
+        <!-- Faculty Live Status Overview -->
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+          <h3 style="font-size: 1rem; font-weight: 600; margin: 0;">Live Faculty Status (Campus-Wide)</h3>
+          <input type="text" id="admin-avail-search" class="form-control" placeholder="Search faculty name or cabin..." style="width: 200px; font-size: 0.8125rem; padding: 0.25rem 0.5rem;">
         </div>
 
         <div class="table-responsive" style="margin-bottom: 2rem;">
@@ -362,9 +369,11 @@
               <tr>
                 <th>Faculty</th>
                 <th>Department</th>
-                <th>Room</th>
+                <th>Cabin</th>
                 <th>Current Status</th>
-                <th>Note</th>
+                <th>Source</th>
+                <th>Note / Details</th>
+                <th>Last Update</th>
               </tr>
             </thead>
             <tbody id="admin-availability-body">
@@ -373,12 +382,95 @@
           </table>
         </div>
 
-        <div class="card-header">
+        <!-- Admin Override Creation / Edit Form -->
+        <div class="card-header" style="border-top: 1px solid var(--border-color); padding-top: 1.5rem;">
           <div>
-            <h3>All Active Overrides Across Campus</h3>
+            <h3 id="admin-override-form-title" style="font-size: 1.05rem; font-weight: 600; margin: 0;">Post Campus Schedule Override</h3>
             <div class="card-subtitle" style="margin-top: 0.25rem;">
-              Temporary schedule changes posted by faculty members.
+              Overrides take strict priority over regular timetables (e.g., official faculty deputation, emergency leave, or extra doubt sessions).
             </div>
+          </div>
+          <span id="admin-ov-duration-badge" style="font-size: 0.75rem; background: var(--border-color); padding: 0.2rem 0.5rem; border-radius: var(--radius-sm); font-weight: 500;">Duration: 1 hr</span>
+        </div>
+
+        <form id="admin-override-form" style="background: var(--surface-muted); padding: 1.25rem; border-radius: var(--radius-sm); margin-bottom: 1.5rem; border: 1px solid var(--border-color);">
+          <input type="hidden" id="admin-ov-edit-id" value="">
+
+          <!-- Live validation / collision preview box -->
+          <div id="admin-ov-validation-alert" style="display: none; padding: 0.5rem 0.75rem; border-radius: var(--radius-sm); font-size: 0.8125rem; margin-bottom: 0.75rem;"></div>
+
+          <div class="form-row">
+            <div class="form-group" style="flex: 1.5;">
+              <label for="admin-ov-faculty">Faculty Member *</label>
+              <select id="admin-ov-faculty" class="form-control" required></select>
+            </div>
+
+            <div class="form-group">
+              <label for="admin-ov-date">Target Date *</label>
+              <input type="date" id="admin-ov-date" class="form-control" required>
+            </div>
+
+            <div class="form-group">
+              <label for="admin-ov-start">Start Time *</label>
+              <input type="time" id="admin-ov-start" class="form-control" required value="10:00">
+            </div>
+
+            <div class="form-group">
+              <label for="admin-ov-end">End Time *</label>
+              <input type="time" id="admin-ov-end" class="form-control" required value="11:00">
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group" style="flex: 1;">
+              <label for="admin-ov-status">Override Status *</label>
+              <select id="admin-ov-status" class="form-control">
+                <option value="available">Available</option>
+                <option value="present">Present in Cabin</option>
+                <option value="in_meeting">In Meeting / Conference</option>
+                <option value="unavailable">Unavailable / On Leave</option>
+                <option value="in_class">Special Extra Class</option>
+              </select>
+            </div>
+
+            <div class="form-group" style="flex: 2;">
+              <label for="admin-ov-note">Reason / Note for Students</label>
+              <input type="text" id="admin-ov-note" class="form-control" placeholder="e.g. Deputed to University Inspection; available online">
+            </div>
+          </div>
+
+          <div style="display: flex; gap: 0.75rem; justify-content: flex-end; align-items: center;">
+            <button type="button" id="btn-cancel-admin-ov" class="btn btn-secondary btn-sm" style="display: none;">Cancel Edit</button>
+            <button type="submit" id="btn-submit-admin-ov" class="btn btn-primary btn-sm">Post Override</button>
+          </div>
+        </form>
+
+        <!-- Overrides Filter & Table -->
+        <div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 0.75rem; margin-bottom: 1rem;">
+          <div style="display: flex; align-items: center; gap: 0.5rem;">
+            <h3 style="font-size: 1.05rem; margin: 0;">Active & Scheduled Overrides</h3>
+            <span id="admin-ov-count-badge" class="badge-status badge-available" style="font-size: 0.75rem;">Loading...</span>
+          </div>
+
+          <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem;">
+            <select id="admin-ov-filter-faculty" class="form-control" style="width: auto; font-size: 0.8125rem; padding: 0.25rem 0.5rem;">
+              <option value="all">All Faculty</option>
+            </select>
+
+            <select id="admin-ov-filter-status" class="form-control" style="width: auto; font-size: 0.8125rem; padding: 0.25rem 0.5rem;">
+              <option value="all">All Statuses</option>
+              <option value="available">Available</option>
+              <option value="present">Present</option>
+              <option value="in_meeting">In Meeting</option>
+              <option value="unavailable">Unavailable</option>
+            </select>
+
+            <select id="admin-ov-filter-timing" class="form-control" style="width: auto; font-size: 0.8125rem; padding: 0.25rem 0.5rem;">
+              <option value="all">All Time</option>
+              <option value="active_today" selected>Today & Upcoming</option>
+              <option value="today">Today Only</option>
+              <option value="past">Past Overrides</option>
+            </select>
           </div>
         </div>
 
@@ -390,8 +482,9 @@
                 <th>Date</th>
                 <th>Time Window</th>
                 <th>Status</th>
+                <th>Timeline</th>
                 <th>Note</th>
-                <th style="width: 100px;">Actions</th>
+                <th style="width: 140px;">Actions</th>
               </tr>
             </thead>
             <tbody id="admin-overrides-body">
@@ -457,6 +550,7 @@
   <script src="js/auth.js"></script>
   <script src="js/faculty-service.js"></script>
   <script src="js/timetable-service.js"></script>
+  <script src="js/availability-service.js"></script>
   <script src="js/admin.js"></script>
   <script src="js/timetable-import.js"></script>
 </body>

@@ -105,8 +105,14 @@ document.addEventListener('DOMContentLoaded', () => {
               </div>
 
               <div style="background: var(--surface-muted); padding: 0.6rem 0.75rem; border-radius: var(--radius-sm); margin-bottom: 1rem;">
-                <div style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 700; color: var(--text-muted);">
-                  Status at ${window.Utils.formatTime12Hour(queryTime)}:
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.25rem;">
+                  <span style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 700; color: var(--text-muted);">
+                    Status at ${window.Utils.formatTime12Hour(queryTime)}:
+                  </span>
+                  ${avail.source === 'override' ? '<span class="badge-status badge-in_meeting" style="font-size: 0.6875rem;">Override</span>' : ''}
+                  ${avail.source === 'timetable' ? '<span class="badge-status badge-in_class" style="font-size: 0.6875rem;">Timetable</span>' : ''}
+                  ${avail.source === 'manual_status' ? '<span class="badge-status badge-present" style="font-size: 0.6875rem;">Manual</span>' : ''}
+                  ${avail.source === 'inactive_account' ? '<span class="badge-status badge-unavailable" style="font-size: 0.6875rem;">Inactive</span>' : ''}
                 </div>
                 <div style="margin-top: 0.2rem; display: flex; align-items: center; gap: 0.5rem;">
                   ${statusBadge}
@@ -230,7 +236,26 @@ document.addEventListener('DOMContentLoaded', () => {
     if (modalOverlay) modalOverlay.style.display = 'flex';
   };
 
-  // Quick check focuses on date/time inputs
+  // Availability Breakdown Modal elements
+  const breakdownModal = document.getElementById('availability-breakdown-modal');
+  const breakdownTitle = document.getElementById('breakdown-faculty-title');
+  const breakdownContent = document.getElementById('breakdown-modal-content');
+  const closeBreakdownBtn = document.getElementById('close-breakdown-modal');
+
+  if (closeBreakdownBtn && breakdownModal) {
+    closeBreakdownBtn.addEventListener('click', () => {
+      breakdownModal.style.display = 'none';
+    });
+  }
+  if (breakdownModal) {
+    breakdownModal.addEventListener('click', (e) => {
+      if (e.target === breakdownModal) {
+        breakdownModal.style.display = 'none';
+      }
+    });
+  }
+
+  // Quick check opens rich 5-tier resolution breakdown modal
   window.quickCheck = async function(facultyId) {
     let faculty = currentLoadedFaculty.find(f => f.id === facultyId);
     if (!faculty) {
@@ -242,12 +267,61 @@ document.addEventListener('DOMContentLoaded', () => {
     const targetTime = checkTimeInput.value;
     const avail = window.Utils.getFacultyAvailability(faculty.id, targetDate, targetTime);
     
-    alert(`Status for ${faculty.full_name} on ${targetDate} at ${window.Utils.formatTime12Hour(targetTime)}:\n\n` +
-          `Status: ${window.Utils.getStatusDisplay(avail.status).label}\n` +
-          `Room/Office: ${avail.room || faculty.room}\n` +
-          (avail.activity ? `Class: ${avail.activity}\n` : '') +
-          (avail.note ? `Note: ${avail.note}\n` : '') +
-          `Resolution Source: ${avail.source}`);
+    if (breakdownTitle) {
+      breakdownTitle.textContent = `${faculty.full_name} • ${faculty.department} (Cabin: ${faculty.room})`;
+    }
+
+    if (breakdownContent) {
+      const dayName = window.Utils.getDayName(targetDate);
+      const timeFormatted = window.Utils.formatTime12Hour(targetTime);
+
+      let sourceBadgeClass = 'badge-not_updated';
+      let sourceTitle = 'Default / Standby';
+      if (avail.source === 'override') {
+        sourceBadgeClass = 'badge-in_meeting';
+        sourceTitle = 'Priority 2: Schedule Override';
+      } else if (avail.source === 'timetable') {
+        sourceBadgeClass = 'badge-in_class';
+        sourceTitle = 'Priority 3: Weekly Timetable';
+      } else if (avail.source === 'manual_status') {
+        sourceBadgeClass = 'badge-present';
+        sourceTitle = 'Priority 4: Manual Faculty Status';
+      } else if (avail.source === 'inactive_account') {
+        sourceBadgeClass = 'badge-unavailable';
+        sourceTitle = 'Priority 1: Inactive Profile';
+      }
+
+      breakdownContent.innerHTML = `
+        <div style="margin-bottom: 1.25rem; display: flex; justify-content: space-between; align-items: center; background: var(--surface-muted); padding: 0.85rem; border-radius: var(--radius-sm);">
+          <div>
+            <div style="font-size: 0.8rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600;">Evaluated Time & Date</div>
+            <div style="font-size: 1rem; font-weight: 700; color: var(--text-main); margin-top: 0.2rem;">${targetDate} (${dayName}) at ${timeFormatted}</div>
+          </div>
+          <div>
+            ${window.Utils.renderStatusBadge(avail.status)}
+          </div>
+        </div>
+
+        <div style="margin-bottom: 1rem;">
+          <div style="font-size: 0.8125rem; font-weight: 600; margin-bottom: 0.35rem; color: var(--text-muted);">Active Resolution Rule:</div>
+          <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem;">
+            <span class="badge-status ${sourceBadgeClass}">${sourceTitle}</span>
+          </div>
+          <p style="font-size: 0.875rem; line-height: 1.5; color: var(--text-main); margin: 0; background: var(--surface); padding: 0.75rem; border-radius: var(--radius-sm); border: 1px solid var(--border-color);">
+            ${avail.reason}
+          </p>
+        </div>
+
+        <div style="font-size: 0.8125rem; color: var(--text-muted); border-top: 1px solid var(--border-color); padding-top: 0.75rem;">
+          <div><strong>Expected Location:</strong> ${avail.room || faculty.room || 'Department Cabin'}</div>
+          ${avail.note ? `<div style="margin-top: 0.25rem;"><strong>Faculty Note:</strong> "${avail.note}"</div>` : ''}
+          ${avail.overrideWindow ? `<div style="margin-top: 0.25rem;"><strong>Override Active Window:</strong> ${avail.overrideWindow}</div>` : ''}
+          ${avail.scheduleWindow ? `<div style="margin-top: 0.25rem;"><strong>Timetable Class Period:</strong> ${avail.scheduleWindow}</div>` : ''}
+        </div>
+      `;
+    }
+
+    if (breakdownModal) breakdownModal.style.display = 'flex';
   };
 
   // Close modal
@@ -264,6 +338,15 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     });
   }
+
+  // Reactive listeners for real-time updates
+  window.addEventListener('availability-data-changed', () => {
+    renderFacultyList();
+  });
+
+  window.addEventListener('override-data-changed', () => {
+    renderFacultyList();
+  });
 
   // Initial render
   renderFacultyList();

@@ -96,6 +96,10 @@ function isTimeOverlap(startA, endA, startB, endB) {
  * }
  */
 function getFacultyAvailability(facultyId, date, time) {
+  if (window.AvailabilityService && typeof window.AvailabilityService.resolveFacultyAvailability === 'function') {
+    return window.AvailabilityService.resolveFacultyAvailability(facultyId, date, time);
+  }
+
   const store = window.DataStore.getStore();
   
   // 1. Inactive faculty account check

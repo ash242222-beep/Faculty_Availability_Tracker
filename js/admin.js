@@ -558,59 +558,415 @@ document.addEventListener('DOMContentLoaded', () => {
   // ==========================================================
   // SECTION 4: AVAILABILITY & OVERRIDES MANAGEMENT
   // ==========================================================
-  function renderAvailabilityAdmin() {
-    const store = window.DataStore.getStore();
-    const availTableBody = document.getElementById('admin-availability-body');
-    const overridesTableBody = document.getElementById('admin-overrides-body');
+  const adminAvailBody = document.getElementById('admin-availability-body');
+  const adminOverridesBody = document.getElementById('admin-overrides-body');
+  const btnRefreshAvail = document.getElementById('btn-refresh-availability-admin');
+  const adminAvailSearch = document.getElementById('admin-avail-search');
 
-    if (availTableBody) {
-      availTableBody.innerHTML = (store.faculty || []).map(f => {
-        const cur = (store.availability || []).find(a => a.faculty_id === f.id);
-        const status = cur ? cur.status : 'not_updated';
-        const note = cur ? cur.note : '';
+  // Override Form elements
+  const adminOvForm = document.getElementById('admin-override-form');
+  const adminOvFormTitle = document.getElementById('admin-override-form-title');
+  const adminOvEditId = document.getElementById('admin-ov-edit-id');
+  const adminOvFaculty = document.getElementById('admin-ov-faculty');
+  const adminOvDate = document.getElementById('admin-ov-date');
+  const adminOvStart = document.getElementById('admin-ov-start');
+  const adminOvEnd = document.getElementById('admin-ov-end');
+  const adminOvStatus = document.getElementById('admin-ov-status');
+  const adminOvNote = document.getElementById('admin-ov-note');
+  const adminOvDurationBadge = document.getElementById('admin-ov-duration-badge');
+  const adminOvValidationAlert = document.getElementById('admin-ov-validation-alert');
+  const btnSubmitAdminOv = document.getElementById('btn-submit-admin-ov');
+  const btnCancelAdminOv = document.getElementById('btn-cancel-admin-ov');
+
+  // Override Filter elements
+  const adminOvFilterFaculty = document.getElementById('admin-ov-filter-faculty');
+  const adminOvFilterStatus = document.getElementById('admin-ov-filter-status');
+  const adminOvFilterTiming = document.getElementById('admin-ov-filter-timing');
+  const adminOvCountBadge = document.getElementById('admin-ov-count-badge');
+
+  // Set default date to today
+  if (adminOvDate && !adminOvDate.value) {
+    adminOvDate.value = new Date().toISOString().split('T')[0];
+  }
+
+  // Populate override faculty select & filter
+  async function populateOverrideFacultySelects() {
+    try {
+      const facultyList = await window.FacultyService.getAllFaculty();
+      if (adminOvFaculty) {
+        const currentVal = adminOvFaculty.value;
+        adminOvFaculty.innerHTML = '<option value="">-- Select Faculty Member --</option>' +
+          facultyList.map(f => `<option value="${f.id}">${f.full_name} (${f.department})</option>`).join('');
+        if (currentVal) adminOvFaculty.value = currentVal;
+      }
+
+      if (adminOvFilterFaculty) {
+        const currentVal = adminOvFilterFaculty.value;
+        adminOvFilterFaculty.innerHTML = '<option value="all">All Faculty</option>' +
+          facultyList.map(f => `<option value="${f.id}">${f.full_name}</option>`).join('');
+        if (currentVal) adminOvFilterFaculty.value = currentVal;
+      }
+    } catch (err) {
+      console.error('Error loading faculty for overrides:', err);
+    }
+  }
+
+  // Check live validation on admin override form
+  function checkLiveAdminOvValidation() {
+    if (!adminOvFaculty || !adminOvDate || !adminOvStart || !adminOvEnd) return;
+
+    const start = adminOvStart.value;
+    const end = adminOvEnd.value;
+    const date = adminOvDate.value;
+    const facultyId = adminOvFaculty.value;
+    const editId = adminOvEditId.value || null;
+
+    if (adminOvDurationBadge && start && end) {
+      adminOvDurationBadge.textContent = `Duration: ${window.Utils.calculateDuration(start, end)}`;
+    }
+
+    if (!adminOvValidationAlert) return;
+
+    if (!facultyId || !date || !start || !end) {
+      adminOvValidationAlert.style.display = 'none';
+      return;
+    }
+
+    const valResult = window.AvailabilityService.validateOverride({
+      faculty_id: facultyId,
+      date: date,
+      start_time: start,
+      end_time: end,
+      status: adminOvStatus ? adminOvStatus.value : 'available',
+      note: adminOvNote ? adminOvNote.value : ''
+    }, editId);
+
+    if (!valResult.isValid) {
+      adminOvValidationAlert.style.display = 'block';
+      adminOvValidationAlert.style.background = '#fef2f2';
+      adminOvValidationAlert.style.color = '#991b1b';
+      adminOvValidationAlert.style.border = '1px solid #fecaca';
+      adminOvValidationAlert.innerHTML = `<strong>Validation Error:</strong> ${valResult.errors.join('<br>')}`;
+    } else if (valResult.warnings.length > 0) {
+      adminOvValidationAlert.style.display = 'block';
+      adminOvValidationAlert.style.background = '#fffbeb';
+      adminOvValidationAlert.style.color = '#92400e';
+      adminOvValidationAlert.style.border = '1px solid #fde68a';
+      adminOvValidationAlert.innerHTML = `<strong>Notice:</strong> ${valResult.warnings.join('<br>')}`;
+    } else {
+      adminOvValidationAlert.style.display = 'block';
+      adminOvValidationAlert.style.background = '#f0fdf4';
+      adminOvValidationAlert.style.color = '#166534';
+      adminOvValidationAlert.style.border = '1px solid #bbf7d0';
+      adminOvValidationAlert.innerHTML = '<strong>Verified:</strong> No timing conflicts or overlapping overrides detected.';
+    }
+  }
+
+  if (adminOvFaculty) adminOvFaculty.addEventListener('change', checkLiveAdminOvValidation);
+  if (adminOvDate) adminOvDate.addEventListener('change', checkLiveAdminOvValidation);
+  if (adminOvStart) adminOvStart.addEventListener('input', checkLiveAdminOvValidation);
+  if (adminOvEnd) adminOvEnd.addEventListener('input', checkLiveAdminOvValidation);
+  if (adminOvStatus) adminOvStatus.addEventListener('change', checkLiveAdminOvValidation);
+
+  // Render Faculty Status Overview
+  async function renderFacultyStatusOverview() {
+    if (!adminAvailBody) return;
+
+    try {
+      const facultyList = await window.FacultyService.getAllFaculty();
+      const searchQuery = (adminAvailSearch ? adminAvailSearch.value : '').toLowerCase().trim();
+
+      const filteredFaculty = facultyList.filter(f => {
+        if (!searchQuery) return true;
+        return f.full_name.toLowerCase().includes(searchQuery) ||
+               (f.department && f.department.toLowerCase().includes(searchQuery)) ||
+               (f.room && f.room.toLowerCase().includes(searchQuery));
+      });
+
+      const now = new Date();
+      const today = now.toISOString().split('T')[0];
+      const currentTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+
+      if (filteredFaculty.length === 0) {
+        adminAvailBody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: var(--text-muted); padding: 1.5rem;">No matching faculty found.</td></tr>`;
+        return;
+      }
+
+      adminAvailBody.innerHTML = filteredFaculty.map(f => {
+        const avail = window.AvailabilityService.resolveFacultyAvailability(f.id, today, currentTime);
+        const statusBadge = window.Utils.renderStatusBadge(avail.status);
+
+        let sourceLabel = '';
+        if (avail.source === 'override') {
+          sourceLabel = `<span class="badge-status badge-in_meeting" style="font-size: 0.7rem;">Override</span>`;
+        } else if (avail.source === 'timetable') {
+          sourceLabel = `<span class="badge-status badge-in_class" style="font-size: 0.7rem;">Class</span>`;
+        } else if (avail.source === 'manual_status') {
+          sourceLabel = `<span class="badge-status badge-present" style="font-size: 0.7rem;">Manual</span>`;
+        } else if (avail.source === 'inactive_account') {
+          sourceLabel = `<span class="badge-status badge-unavailable" style="font-size: 0.7rem;">Paused</span>`;
+        } else {
+          sourceLabel = `<span class="badge-status badge-not_updated" style="font-size: 0.7rem;">None</span>`;
+        }
+
+        let detailText = '—';
+        if (avail.source === 'override') {
+          detailText = `Window: ${avail.overrideWindow}${avail.note ? ` (${avail.note})` : ''}`;
+        } else if (avail.source === 'timetable') {
+          detailText = `${avail.activity} in ${avail.room} (${avail.scheduleWindow})`;
+        } else if (avail.note) {
+          detailText = avail.note;
+        }
+
+        const lastUpdated = avail.timeAgoText || (avail.updatedAt ? new Date(avail.updatedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Today');
 
         return `
           <tr>
             <td><strong>${f.full_name}</strong></td>
             <td>${f.department}</td>
             <td>${f.room}</td>
-            <td>${window.Utils.renderStatusBadge(status)}</td>
-            <td>${note || '<span style="color: var(--text-muted)">—</span>'}</td>
+            <td>${statusBadge}</td>
+            <td>${sourceLabel}</td>
+            <td><span style="font-size: 0.85rem;">${detailText}</span></td>
+            <td><span style="font-size: 0.8125rem; color: var(--text-muted);">${lastUpdated}</span></td>
           </tr>
         `;
       }).join('');
-    }
-
-    if (overridesTableBody) {
-      if (!store.overrides || store.overrides.length === 0) {
-        overridesTableBody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--text-muted); padding: 1.5rem;">No active overrides.</td></tr>`;
-      } else {
-        overridesTableBody.innerHTML = store.overrides.map(ov => {
-          const f = (store.faculty || []).find(item => item.id === ov.faculty_id);
-          return `
-            <tr>
-              <td><strong>${f ? f.full_name : 'Unknown'}</strong></td>
-              <td>${ov.date}</td>
-              <td>${window.Utils.formatTime12Hour(ov.start_time)} - ${window.Utils.formatTime12Hour(ov.end_time)}</td>
-              <td>${window.Utils.renderStatusBadge(ov.status)}</td>
-              <td>${ov.note || '—'}</td>
-              <td>
-                <button class="btn btn-danger btn-sm" onclick="window.adminDeleteOverride('${ov.id}')">Remove</button>
-              </td>
-            </tr>
-          `;
-        }).join('');
-      }
+    } catch (err) {
+      console.error('Error rendering faculty status overview:', err);
     }
   }
 
-  window.adminDeleteOverride = function(overrideId) {
-    if (!confirm('Cancel this override?')) return;
-    const store = window.DataStore.getStore();
-    store.overrides = (store.overrides || []).filter(o => o.id !== overrideId);
-    window.DataStore.saveStore(store);
-    renderAvailabilityAdmin();
+  // Render Overrides Table
+  async function renderOverridesAdmin() {
+    if (!adminOverridesBody) return;
+
+    try {
+      const selectedFaculty = adminOvFilterFaculty ? adminOvFilterFaculty.value : 'all';
+      const selectedStatus = adminOvFilterStatus ? adminOvFilterStatus.value : 'all';
+      const timingFilter = adminOvFilterTiming ? adminOvFilterTiming.value : 'active_today';
+
+      const overrides = await window.AvailabilityService.getAllOverrides({
+        facultyId: selectedFaculty,
+        status: selectedStatus
+      });
+
+      const facultyList = await window.FacultyService.getAllFaculty();
+      const facultyMap = new Map(facultyList.map(f => [f.id, f]));
+
+      const now = new Date();
+      const todayStr = now.toISOString().split('T')[0];
+      const currentTimeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+
+      // Filter by timing
+      let filteredOverrides = overrides.filter(ov => {
+        if (timingFilter === 'today') {
+          return ov.date === todayStr;
+        }
+        if (timingFilter === 'active_today') {
+          return ov.date >= todayStr;
+        }
+        if (timingFilter === 'past') {
+          return ov.date < todayStr;
+        }
+        return true; // 'all'
+      });
+
+      if (adminOvCountBadge) {
+        adminOvCountBadge.textContent = `${filteredOverrides.length} Override${filteredOverrides.length === 1 ? '' : 's'}`;
+      }
+
+      if (filteredOverrides.length === 0) {
+        adminOverridesBody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: var(--text-muted); padding: 1.75rem;">No overrides matching the current filter.</td></tr>`;
+        return;
+      }
+
+      adminOverridesBody.innerHTML = filteredOverrides.map(ov => {
+        const fac = facultyMap.get(ov.faculty_id);
+        const facultyName = fac ? fac.full_name : 'Unknown Faculty';
+        const durationText = window.Utils.calculateDuration(ov.start_time, ov.end_time);
+
+        // Calculate timeline status
+        let timelineBadge = '';
+        if (ov.date === todayStr) {
+          if (window.Utils.isTimeBetween(currentTimeStr, ov.start_time, ov.end_time)) {
+            timelineBadge = `<span class="badge-status badge-available" style="font-size: 0.7rem; font-weight: 700;">Active Now</span>`;
+          } else if (window.Utils.compareTime(currentTimeStr, ov.start_time) < 0) {
+            timelineBadge = `<span class="badge-status badge-in_meeting" style="font-size: 0.7rem;">Today Later</span>`;
+          } else {
+            timelineBadge = `<span class="badge-status badge-not_updated" style="font-size: 0.7rem;">Expired Today</span>`;
+          }
+        } else if (ov.date > todayStr) {
+          timelineBadge = `<span class="badge-status badge-in_class" style="font-size: 0.7rem;">Upcoming</span>`;
+        } else {
+          timelineBadge = `<span class="badge-status badge-not_updated" style="font-size: 0.7rem;">Past</span>`;
+        }
+
+        return `
+          <tr>
+            <td>
+              <strong>${facultyName}</strong>
+              <div style="font-size: 0.75rem; color: var(--text-muted);">${fac ? fac.department : ''}</div>
+            </td>
+            <td>
+              <strong>${ov.date}</strong>
+              <div style="font-size: 0.75rem; color: var(--text-muted);">${window.Utils.getDayName(ov.date)}</div>
+            </td>
+            <td>
+              <div>${window.Utils.formatTime12Hour(ov.start_time)} - ${window.Utils.formatTime12Hour(ov.end_time)}</div>
+              <span style="font-size: 0.75rem; color: var(--text-muted);">${durationText}</span>
+            </td>
+            <td>${window.Utils.renderStatusBadge(ov.status)}</td>
+            <td>${timelineBadge}</td>
+            <td>${ov.note || '<span style="color: var(--text-muted)">—</span>'}</td>
+            <td>
+              <div style="display: flex; gap: 0.35rem;">
+                <button class="btn btn-secondary btn-sm" onclick="window.adminEditOverride('${ov.id}')">Edit</button>
+                <button class="btn btn-danger btn-sm" onclick="window.adminDeleteOverride('${ov.id}')">Remove</button>
+              </div>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    } catch (err) {
+      console.error('Error rendering overrides table:', err);
+    }
+  }
+
+  // Combined render function for availability section
+  async function renderAvailabilityAdmin() {
+    await populateOverrideFacultySelects();
+    await renderFacultyStatusOverview();
+    await renderOverridesAdmin();
+  }
+
+  // Form submit handler for admin overrides
+  if (adminOvForm) {
+    adminOvForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const editId = adminOvEditId.value || null;
+
+      const payload = {
+        faculty_id: adminOvFaculty.value,
+        date: adminOvDate.value,
+        start_time: adminOvStart.value,
+        end_time: adminOvEnd.value,
+        status: adminOvStatus.value,
+        note: adminOvNote.value.trim()
+      };
+
+      btnSubmitAdminOv.disabled = true;
+      btnSubmitAdminOv.textContent = editId ? 'Updating...' : 'Posting...';
+
+      try {
+        let res;
+        if (editId) {
+          res = await window.AvailabilityService.updateOverride(editId, payload);
+        } else {
+          res = await window.AvailabilityService.addOverride(payload);
+        }
+
+        if (res.success) {
+          adminOvEditId.value = '';
+          adminOvForm.reset();
+          if (adminOvDate) adminOvDate.value = new Date().toISOString().split('T')[0];
+          if (adminOvFormTitle) adminOvFormTitle.textContent = 'Post Campus Schedule Override';
+          btnSubmitAdminOv.textContent = 'Post Override';
+          btnCancelAdminOv.style.display = 'none';
+          if (adminOvValidationAlert) adminOvValidationAlert.style.display = 'none';
+
+          await renderAvailabilityAdmin();
+
+          if (res.warnings && res.warnings.length > 0) {
+            alert(`Override saved successfully!\n\n${res.warnings.join('\n')}`);
+          } else {
+            alert(editId ? 'Override updated successfully.' : 'Schedule override created successfully.');
+          }
+        } else {
+          alert('Validation Conflict Error:\n' + res.error);
+          checkLiveAdminOvValidation();
+        }
+      } catch (err) {
+        alert('Error saving override: ' + err.message);
+      } finally {
+        btnSubmitAdminOv.disabled = false;
+        btnSubmitAdminOv.textContent = editId ? 'Update Override' : 'Post Override';
+      }
+    });
+  }
+
+  // Admin Edit Override
+  window.adminEditOverride = async function(overrideId) {
+    try {
+      const ov = await window.AvailabilityService.getOverrideById(overrideId);
+      if (!ov) {
+        alert('Override record not found.');
+        return;
+      }
+
+      adminOvEditId.value = ov.id;
+      if (adminOvFaculty) adminOvFaculty.value = ov.faculty_id;
+      if (adminOvDate) adminOvDate.value = ov.date;
+      if (adminOvStart) adminOvStart.value = ov.start_time;
+      if (adminOvEnd) adminOvEnd.value = ov.end_time;
+      if (adminOvStatus) adminOvStatus.value = ov.status;
+      if (adminOvNote) adminOvNote.value = ov.note || '';
+
+      if (adminOvFormTitle) adminOvFormTitle.textContent = 'Edit Campus Schedule Override';
+      btnSubmitAdminOv.textContent = 'Update Override';
+      btnCancelAdminOv.style.display = 'inline-block';
+      checkLiveAdminOvValidation();
+      adminOvForm.scrollIntoView({ behavior: 'smooth' });
+    } catch (err) {
+      alert('Error loading override: ' + err.message);
+    }
   };
+
+  // Cancel Admin Override Edit
+  if (btnCancelAdminOv) {
+    btnCancelAdminOv.addEventListener('click', () => {
+      adminOvEditId.value = '';
+      adminOvForm.reset();
+      if (adminOvDate) adminOvDate.value = new Date().toISOString().split('T')[0];
+      if (adminOvFormTitle) adminOvFormTitle.textContent = 'Post Campus Schedule Override';
+      btnSubmitAdminOv.textContent = 'Post Override';
+      btnCancelAdminOv.style.display = 'none';
+      if (adminOvValidationAlert) adminOvValidationAlert.style.display = 'none';
+      if (adminOvDurationBadge) adminOvDurationBadge.textContent = 'Duration: 1 hr';
+    });
+  }
+
+  // Admin Delete Override
+  window.adminDeleteOverride = async function(overrideId) {
+    if (!confirm('Are you sure you want to cancel and remove this schedule override?')) return;
+
+    try {
+      const res = await window.AvailabilityService.deleteOverride(overrideId);
+      if (res.success) {
+        await renderAvailabilityAdmin();
+        alert('Override removed successfully.');
+      } else {
+        alert('Error: ' + res.error);
+      }
+    } catch (err) {
+      alert('Error removing override: ' + err.message);
+    }
+  };
+
+  // Filter change listeners
+  if (adminOvFilterFaculty) adminOvFilterFaculty.addEventListener('change', renderOverridesAdmin);
+  if (adminOvFilterStatus) adminOvFilterStatus.addEventListener('change', renderOverridesAdmin);
+  if (adminOvFilterTiming) adminOvFilterTiming.addEventListener('change', renderOverridesAdmin);
+  if (adminAvailSearch) adminAvailSearch.addEventListener('input', renderFacultyStatusOverview);
+  if (btnRefreshAvail) btnRefreshAvail.addEventListener('click', renderAvailabilityAdmin);
+
+  // Global change listeners for real-time reactivity
+  window.addEventListener('availability-data-changed', () => {
+    renderAvailabilityAdmin();
+  });
+  window.addEventListener('override-data-changed', () => {
+    renderAvailabilityAdmin();
+  });
 
   // ==========================================================
   // SECTION 5: IMPORT HISTORY
