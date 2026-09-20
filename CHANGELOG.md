@@ -7,6 +7,24 @@ and this project adheres to Semantic Versioning.
 
 ---
 
+## [v1.0.0] - 2026-09-20 - Milestone 9: Production Release
+
+### Added
+- **Production Deployment Readiness (`vercel.json`)**:
+  - Implemented single-command static deployment configuration for Vercel with clean URLs and custom routing.
+  - Added enterprise HTTP security headers: `X-Content-Type-Options: nosniff`, `X-Frame-Options: SAMEORIGIN`, `X-XSS-Protection: 1; mode=block`, and `Referrer-Policy: strict-origin-when-cross-origin`.
+  - Configured long-term immutable caching headers (`max-age=31536000`) for static CSS and JavaScript bundles.
+- **Comprehensive Viva & Project Defense Guide (`docs/VIVA_PREPARATION.md`)**:
+  - Full system design breakdown, mathematical formulations for the 5-tier availability resolution algorithm and interval overlap detection.
+  - Complete 10-minute live demonstration script with exact presenter talking points across Student, Faculty, and Admin portals.
+  - Top 20 viva examiner technical questions and high-scoring model answers covering RLS, collision logic, PDF extraction, indexing, and offline architecture.
+- **Master Documentation Updates (`README.md`, `metadata.json`)**:
+  - Updated master architecture directory map with service layer modules and documentation links.
+  - Fully verified all 8 milestones and transitioned active version marker to `v1.0.0`.
+  - Validated offline `localStorage` fallback across all services for zero-failure demonstration environments.
+
+---
+
 ## [v0.8.0] - 2026-09-20 - Milestone 8: Security & Polish
 
 ### Added

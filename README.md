@@ -75,8 +75,13 @@ The system supports three user roles:
 │   ├── supabase-client.js       # Client connection layer & localStorage mock store
 │   ├── auth.js                  # Session handling, role guards, route protection
 │   ├── utils.js                 # Central getFacultyAvailability() logic & formatters
-│   ├── student.js               # Student portal interactive logic
-│   ├── faculty.js               # Faculty dashboard interactive logic
+│   ├── error-boundary.js        # Global uncaught error listener & toast notifications
+│   ├── student.js               # Student portal interactive logic & breakdown modal
+│   ├── faculty.js               # Faculty dashboard status & override management
+│   ├── faculty-service.js       # Faculty CRUD data service layer
+│   ├── timetable-service.js     # Timetable CRUD & multi-conflict validation service
+│   ├── availability-service.js  # 5-tier central availability resolution service
+│   ├── import-service.js        # Timetable import audit logging service
 │   ├── admin.js                 # Admin management CRUD & tab controllers
 │   └── timetable-import.js      # CSV/PDF parser, validation & staged preview
 │
@@ -88,10 +93,13 @@ The system supports three user roles:
 ├── docs/
 │   ├── PRD.md                   # Product Requirements Document
 │   ├── ARCHITECTURE.md          # System architecture and technical design
+│   ├── RLS_SECURITY_AUDIT.md    # Row Level Security threat model & audit spec
+│   ├── VIVA_PREPARATION.md      # Comprehensive Viva defense guide & 20 Q&As
 │   └── VERSION_HISTORY.md       # Full milestone release log
 │
+├── vercel.json                  # Production Vercel static routing & security headers
 ├── README.md                    # Complete project manual (this file)
-├── VERSION                      # Current semantic version marker (v0.1.0)
+├── VERSION                      # Current semantic version marker (v1.0.0)
 └── CHANGELOG.md                 # Detailed version release changes
 ```
 
@@ -109,13 +117,13 @@ The system supports three user roles:
    ```
 3. Open your browser to `http://localhost:3000`.
 
-In Google AI Studio, the application is automatically served at port 3000 and visible in the preview window.
+In Google AI Studio, the application is automatically served at port 3000 and visible in the live preview window.
 
 ---
 
 ## 6. Supabase Configuration
 
-When ready to link to a live Supabase project (Milestone v0.2.0):
+When ready to link to a live Supabase project:
 
 1. Log into your [Supabase Dashboard](https://supabase.com).
 2. Create a new project named `faculty-availability-tracker`.
@@ -130,6 +138,8 @@ When ready to link to a live Supabase project (Milestone v0.2.0):
    SUPABASE_ANON_KEY: 'your-anon-key'
    ```
 
+*(Note: The application includes a transparent offline LocalStorage fallback, allowing complete evaluation and demonstration even without an active Supabase connection).*
+
 ---
 
 ## 7. Authentication & Role Permissions
@@ -142,7 +152,7 @@ The application implements three access tiers:
 | **Faculty** | Read own schedule, update own current status, manage own overrides. | `student.html`, `faculty.html` |
 | **Admin** | Full management access: add/edit faculty, timetables, imports, overrides. | `student.html`, `faculty.html`, `admin.html` |
 
-In `v0.1.0`, quick 1-click test credentials are provided directly on `login.html`:
+Quick 1-click test credentials are provided directly on `login.html`:
 - **Student**: `student@college.edu`
 - **Faculty**: `rahul.sharma@college.edu`
 - **Admin**: `admin@college.edu`
@@ -151,32 +161,34 @@ In `v0.1.0`, quick 1-click test credentials are provided directly on `login.html
 
 ## 8. Deployment (Vercel)
 
-The frontend uses standard static HTML5, CSS3, and JavaScript:
+The application includes an optimized `vercel.json` deployment configuration:
 1. Push the project repository to GitHub.
 2. Import the repository into [Vercel](https://vercel.com).
-3. Framework Preset: **Other** / **Static**.
+3. Framework Preset: **Other** / **Static** (or default Vite build if bundling via `npm run build`).
 4. Root Directory: `./`
-5. Click **Deploy**. Vercel will serve `index.html` as the default landing page.
+5. Click **Deploy**. Vercel will serve `index.html` as the default landing page with custom security headers and asset caching.
 
 ---
 
-## 9. GitHub Workflow & Release Process
+## 9. GitHub Workflow & Milestone Roadmap
 
 Releases follow semantic milestone versions:
-- `v0.1.0` - Static UI (Completed)
-- `v0.2.0` - Supabase Authentication (Completed)
-- `v0.3.0` - Faculty Database & Search (Completed)
-- `v0.4.0` - Timetable Engine & Validation (Current)
-- `v0.5.0` - Central Availability & Overrides (Next)
-- `v0.6.0` - CSV Timetable Import
-- `v0.7.0` - Text PDF Timetable Import
-- `v0.8.0` - Security Hardening & Polish
-- `v1.0.0` - Final Production Release
+- `v0.1.0` - Static UI & Architecture (Completed)
+- `v0.2.0` - Supabase Authentication & Role Guards (Completed)
+- `v0.3.0` - Faculty Database & Search Engine (Completed)
+- `v0.4.0` - Timetable Engine & Validation (Completed)
+- `v0.5.0` - Central Availability & Overrides Engine (Completed)
+- `v0.6.0` - Live CSV Timetable Import & Audit History (Completed)
+- `v0.7.0` - Live Text-based PDF Timetable Import (Completed)
+- `v0.8.0` - Security Hardening, RLS & Mobile Polish (Completed)
+- `v1.0.0` - Final Production Release & Viva Defense Suite (Completed)
 
 ---
 
 ## 10. Current Version Status
 
-- **Active Version**: `v0.4.0`
-- **Milestone Name**: Timetable Engine & Validation (`TimetableService`, overlap/room collision engine, interactive validation, filtering, duration metrics)
-- **Status**: Complete and ready for user review.
+- **Active Version**: `v1.0.0` (Production Release)
+- **Milestone Name**: Production Release, Deployment Readiness & Complete Viva Defense Suite
+- **Status**: Production Ready, Fully Verified, All Milestones Completed.
+- **Viva Documentation**: See `docs/VIVA_PREPARATION.md` for the complete 10-minute presentation walkthrough and 20 examiner Q&As.
+
