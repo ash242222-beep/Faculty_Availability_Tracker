@@ -7,6 +7,27 @@ and this project adheres to Semantic Versioning.
 
 ---
 
+## [v0.8.0] - 2026-09-20 - Milestone 8: Security & Polish
+
+### Added
+- **Production Row Level Security (RLS) Policies (`supabase/policies.sql`)**:
+  - Hardened policies for `faculty`, `timetables`, `availability`, `availability_overrides`, and `timetable_imports`.
+  - Implemented `public.get_user_role()` with defensive fallback parsing JWT `user_metadata` and `app_metadata`.
+  - Added idempotent `DROP POLICY IF EXISTS` directives to allow zero-error migrations in the Supabase SQL editor.
+  - Authored comprehensive security specification and threat model in `docs/RLS_SECURITY_AUDIT.md`.
+- **Global Error Boundary & Toast Notification Engine (`js/error-boundary.js`)**:
+  - Global uncaught error listener (`window.addEventListener('error')`) and unhandled promise rejection listener (`window.addEventListener('unhandledrejection')`) to prevent silent failures.
+  - Benign platform message filtering (suppresses normal DevTools and WebSocket connection warnings).
+  - Accessible, styled toast notification engine with auto-dismiss timers, status icons, close buttons, and ARIA attributes (`aria-live="polite"`).
+  - Wired into all 5 application pages (`index.html`, `student.html`, `faculty.html`, `admin.html`, `login.html`).
+- **Mobile Optimization & Touch Target Compliance (`css/style.css`)**:
+  - Enforced minimum 44px touch targets across all mobile buttons, navigation links, form controls, selects, and status selectors per WCAG mobile accessibility guidelines.
+  - Mobile bottom-sheet layout for modals on viewports `< 640px` with full-width primary actions and enlarged close targets.
+  - iOS zoom prevention (`font-size: 16px` on input focus) and safe-area insets (`env(safe-area-inset-bottom)`).
+  - Fluid mobile navigation bar with centered, wrap-friendly tap targets.
+
+---
+
 ## [v0.7.0] - 2026-09-20 - Milestone 7: Live Text-based PDF Timetable Import
 
 ### Added

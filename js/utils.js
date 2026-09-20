@@ -218,7 +218,12 @@ function renderStatusBadge(statusKey) {
  */
 function showNotification(message, type = 'info', containerId = 'notification-container') {
   const container = document.getElementById(containerId);
-  if (!container) return;
+  if (!container) {
+    if (window.ErrorBoundary && typeof window.ErrorBoundary.showToast === 'function') {
+      window.ErrorBoundary.showToast(message, type);
+    }
+    return;
+  }
 
   const alertDiv = document.createElement('div');
   alertDiv.className = `alert alert-${type}`;
