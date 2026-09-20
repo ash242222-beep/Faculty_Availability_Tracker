@@ -8,6 +8,15 @@ document.addEventListener('DOMContentLoaded', () => {
   Auth.requireRole(['admin']);
   Auth.initHeaderAuth();
 
+  // Helper: debounce
+  const debounce = (window.Utils && window.Utils.debounce) || function(fn, delay = 250) {
+    let timer = null;
+    return function(...args) {
+      clearTimeout(timer);
+      timer = setTimeout(() => fn.apply(this, args), delay);
+    };
+  };
+
   // Navigation tab switcher
   const tabButtons = document.querySelectorAll('.admin-tab-btn');
   const sections = document.querySelectorAll('.admin-section');
@@ -24,7 +33,9 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     });
     if (sectionId === 'section-availability') {
-      renderFacultyAvailabilityOverview();
+      if (typeof renderFacultyAvailabilityOverview === 'function') {
+        renderFacultyAvailabilityOverview();
+      }
     }
   }
 

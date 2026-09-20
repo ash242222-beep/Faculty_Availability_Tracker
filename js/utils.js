@@ -239,6 +239,19 @@ function showNotification(message, type = 'info', containerId = 'notification-co
   }, 4000);
 }
 
+/**
+ * Debounce utility helper
+ */
+function debounce(fn, delay = 250) {
+  let timer = null;
+  return function(...args) {
+    clearTimeout(timer);
+    timer = setTimeout(() => fn.apply(this, args), delay);
+  };
+}
+
+window.debounce = debounce;
+
 window.Utils = {
   getDayName,
   compareTime,
@@ -249,5 +262,6 @@ window.Utils = {
   getFacultyAvailability,
   getStatusDisplay,
   renderStatusBadge,
-  showNotification
+  showNotification,
+  debounce
 };
