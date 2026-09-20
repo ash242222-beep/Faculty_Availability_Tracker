@@ -521,23 +521,125 @@
 
   /**
    * Batch insert timetable records (used by CSV/PDF import)
+   * Supports import modes:
+   *  - 'append' (default): appends valid entries
+   *  - 'replace_faculty': wipes existing timetables for faculty present in the batch, then inserts new rows
+   * 
+   * @param {Array<Object>} records - Timetable records to import
+   * @param {Object} options - { mode: 'append'|'replace_faculty' }
+   * @returns {Promise<Object>} { imported: number, failed: number, errors: string[] }
    */
-  async function batchImportTimetables(records) {
+  async function batchImportTimetables(records, options = {}) {
+    const mode = options.mode || 'append';
     const results = {
       imported: 0,
       failed: 0,
       errors: []
     };
 
-    for (const record of records) {
-      const res = await addTimetable(record);
-      if (res.success) {
-        results.imported++;
-      } else {
-        results.failed++;
-        results.errors.push(`${record.activity} (${record.day_of_week}): ${res.error}`);
+    if (!records || records.length === 0) {
+      return results;
+    }
+
+    const client = window.SupabaseService && window.SupabaseService.getClient();
+
+    // If replace_faculty mode: collect distinct faculty IDs and delete old slots
+    if (mode === 'replace_faculty') {
+      const distinctFacultyIds = [...new Set(records.map(r => r.faculty_id).filter(Boolean))];
+      if (distinctFacultyIds.length > 0) {
+        if (client) {
+          try {
+            await client.from('timetables').delete().in('faculty_id', distinctFacultyIds);
+          } catch (err) {
+            console.warn('Supabase bulk delete for replace_faculty warning:', err);
+          }
+        }
+        // Update local DataStore cache
+        const store = window.DataStore ? window.DataStore.getStore() : { timetables: [] };
+        store.timetables = (store.timetables || []).filter(t => !distinctFacultyIds.includes(t.faculty_id));
+        if (window.DataStore) window.DataStore.saveStore(store);
       }
     }
+
+    // Prepare payloads
+    const validPayloads = [];
+    for (const record of records) {
+      const cleanStart = normalizeTime(record.start_time);
+      const cleanEnd = normalizeTime(record.end_time);
+
+      if (!record.faculty_id || !record.day_of_week || !cleanStart || !cleanEnd || !record.activity) {
+        results.failed++;
+        results.errors.push(`Incomplete row: "${record.activity || 'Unknown'}"`);
+        continue;
+      }
+
+      validPayloads.push({
+        faculty_id: record.faculty_id,
+        day_of_week: record.day_of_week,
+        start_time: cleanStart,
+        end_time: cleanEnd,
+        activity: (record.activity || '').trim(),
+        room: (record.room || '').trim(),
+        is_active: record.is_active !== false
+      });
+    }
+
+    // Perform bulk insertion via Supabase if available
+    let bulkSucceeded = false;
+    let insertedRows = [];
+
+    if (client && validPayloads.length > 0) {
+      try {
+        const { data, error } = await client
+          .from('timetables')
+          .insert(validPayloads)
+          .select();
+
+        if (error) {
+          console.warn('Supabase bulk insert notice, falling back to individual inserts:', error.message);
+        } else if (data) {
+          bulkSucceeded = true;
+          insertedRows = data.map(d => ({
+            ...d,
+            start_time: normalizeTime(d.start_time),
+            end_time: normalizeTime(d.end_time)
+          }));
+          results.imported = insertedRows.length;
+        }
+      } catch (err) {
+        console.warn('Supabase bulk insert error:', err);
+      }
+    }
+
+    // Fallback or local insertion
+    if (!bulkSucceeded && validPayloads.length > 0) {
+      const store = window.DataStore ? window.DataStore.getStore() : { timetables: [] };
+      store.timetables = store.timetables || [];
+
+      for (const payload of validPayloads) {
+        const localEntry = {
+          ...payload,
+          id: 'imp-tt-' + Date.now() + '-' + Math.random().toString(36).substr(2, 5),
+          created_at: new Date().toISOString()
+        };
+        store.timetables.push(localEntry);
+        insertedRows.push(localEntry);
+        results.imported++;
+      }
+
+      if (window.DataStore) window.DataStore.saveStore(store);
+    } else if (bulkSucceeded && insertedRows.length > 0) {
+      // Sync into local DataStore cache
+      const store = window.DataStore ? window.DataStore.getStore() : { timetables: [] };
+      store.timetables = store.timetables || [];
+      const newIds = new Set(insertedRows.map(r => r.id));
+      store.timetables = store.timetables.filter(t => !newIds.has(t.id)).concat(insertedRows);
+      if (window.DataStore) window.DataStore.saveStore(store);
+    }
+
+    window.dispatchEvent(new CustomEvent('timetable-data-changed', {
+      detail: { action: 'batch-import', imported: results.imported, mode }
+    }));
 
     return results;
   }

@@ -971,34 +971,112 @@ document.addEventListener('DOMContentLoaded', () => {
   // ==========================================================
   // SECTION 5: IMPORT HISTORY
   // ==========================================================
-  function renderImportHistory() {
-    const store = window.DataStore.getStore();
-    const historyBody = document.getElementById('import-history-body');
+  const historyBody = document.getElementById('import-history-body');
+  const importFilterType = document.getElementById('import-filter-type');
+  const importFilterStatus = document.getElementById('import-filter-status');
+  const importSearchQuery = document.getElementById('import-search-query');
+  const btnRefreshImports = document.getElementById('btn-refresh-imports');
+  const btnClearImports = document.getElementById('btn-clear-imports');
+
+  async function renderImportHistory() {
     if (!historyBody) return;
 
-    if (!store.imports || store.imports.length === 0) {
-      historyBody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: var(--text-muted); padding: 1.5rem;">No timetable imports recorded yet.</td></tr>`;
-      return;
+    try {
+      const filters = {
+        fileType: importFilterType ? importFilterType.value : 'all',
+        status: importFilterStatus ? importFilterStatus.value : 'all',
+        searchQuery: importSearchQuery ? importSearchQuery.value : ''
+      };
+
+      let logs = [];
+      if (window.ImportService) {
+        logs = await window.ImportService.getImportHistory(filters);
+      } else {
+        const store = window.DataStore ? window.DataStore.getStore() : { imports: [] };
+        logs = store.imports || [];
+      }
+
+      if (!logs || logs.length === 0) {
+        historyBody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: var(--text-muted); padding: 2rem;">No timetable import history found matching the filters.</td></tr>`;
+        return;
+      }
+
+      historyBody.innerHTML = logs.map(imp => {
+        let statusBadge = `<span class="badge-status badge-available">SUCCESS</span>`;
+        if (imp.status === 'partial') statusBadge = `<span class="badge-status badge-in_meeting">PARTIAL</span>`;
+        if (imp.status === 'failed') statusBadge = `<span class="badge-status badge-unavailable">FAILED</span>`;
+
+        const dateObj = new Date(imp.created_at || Date.now());
+        const formattedDate = `${dateObj.toLocaleDateString()} ${dateObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+
+        return `
+          <tr id="imp-row-${imp.id}">
+            <td><strong>${imp.file_name}</strong></td>
+            <td><span class="badge-status badge-not_updated" style="font-size: 0.75rem;">${(imp.file_type || 'CSV').toUpperCase()}</span></td>
+            <td>${imp.uploaded_by}</td>
+            <td>${imp.rows_detected}</td>
+            <td><strong>${imp.rows_imported}</strong></td>
+            <td>${statusBadge}</td>
+            <td style="font-size: 0.8125rem; color: var(--text-muted);">${formattedDate}</td>
+            <td style="text-align: center;">
+              <button class="btn btn-secondary btn-sm" onclick="window.adminDeleteImportLog('${imp.id}')" title="Delete log entry" style="padding: 0.25rem 0.5rem; color: var(--danger);">
+                ✕
+              </button>
+            </td>
+          </tr>
+        `;
+      }).join('');
+
+    } catch (err) {
+      console.error('Error rendering import history:', err);
     }
-
-    historyBody.innerHTML = store.imports.map(imp => {
-      let statusBadge = `<span class="badge-status badge-available">${imp.status.toUpperCase()}</span>`;
-      if (imp.status === 'partial') statusBadge = `<span class="badge-status badge-in_meeting">PARTIAL</span>`;
-      if (imp.status === 'failed') statusBadge = `<span class="badge-status badge-unavailable">FAILED</span>`;
-
-      return `
-        <tr>
-          <td><strong>${imp.file_name}</strong></td>
-          <td><span class="badge-status badge-not_updated">${imp.file_type.toUpperCase()}</span></td>
-          <td>${imp.uploaded_by}</td>
-          <td>${imp.rows_detected}</td>
-          <td><strong>${imp.rows_imported}</strong></td>
-          <td>${statusBadge}</td>
-          <td>${new Date(imp.created_at).toLocaleDateString()}</td>
-        </tr>
-      `;
-    }).join('');
   }
+
+  // Delete single import log
+  window.adminDeleteImportLog = async function(id) {
+    if (!confirm('Delete this import audit record from history?')) return;
+    try {
+      if (window.ImportService) {
+        await window.ImportService.deleteImportLog(id);
+      }
+      renderImportHistory();
+    } catch (err) {
+      alert('Error removing log: ' + err.message);
+    }
+  };
+
+  // Clear all logs
+  if (btnClearImports) {
+    btnClearImports.addEventListener('click', async () => {
+      if (!confirm('Are you sure you want to clear all import audit logs? This action cannot be undone.')) return;
+      try {
+        if (window.ImportService) {
+          await window.ImportService.clearAllImportHistory();
+        }
+        renderImportHistory();
+      } catch (err) {
+        alert('Error clearing logs: ' + err.message);
+      }
+    });
+  }
+
+  // Filter change events
+  if (importFilterType) importFilterType.addEventListener('change', renderImportHistory);
+  if (importFilterStatus) importFilterStatus.addEventListener('change', renderImportHistory);
+  if (btnRefreshImports) btnRefreshImports.addEventListener('click', renderImportHistory);
+
+  let searchTimeout = null;
+  if (importSearchQuery) {
+    importSearchQuery.addEventListener('input', () => {
+      clearTimeout(searchTimeout);
+      searchTimeout = setTimeout(renderImportHistory, 200);
+    });
+  }
+
+  // Real-time listener for import log changes
+  window.addEventListener('import-history-changed', () => {
+    renderImportHistory();
+  });
 
   // Initial runs
   renderFacultyTable();

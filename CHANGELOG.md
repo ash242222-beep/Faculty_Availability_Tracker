@@ -7,6 +7,64 @@ and this project adheres to Semantic Versioning.
 
 ---
 
+## [v0.6.0] - 2026-09-20 - Milestone 6: Live CSV Timetable Import
+
+### Added
+- **Centralized Import Service Layer (`js/import-service.js`)**:
+  - Direct integration with Supabase `public.timetable_imports` with transparent offline fallback to `window.DataStore`.
+  - Methods: `recordImportLog()`, `getImportHistory()`, `deleteImportLog()`, `clearAllImportHistory()`.
+  - Dispatches `import-history-changed` event to synchronize UI components across tabs without manual page reload.
+- **Production-Grade RFC 4180 CSV Engine (`js/timetable-import.js`)**:
+  - Resilient parser supporting quoted cells containing commas, escaped quotes (`""`), tabs, semicolons, and diverse newline separators (`\r\n`, `\r`, `\n`).
+  - **Fuzzy Header Mapping**: Dynamically binds columns regardless of order or naming variants (`faculty_name`, `professor`, `teacher`, `instructor`, `activity`, `subject`, `course`, `lecture`, `start_time`, `from`, `end_time`, `to`, `room`, `venue`, `cabin`, `lab`).
+  - **12-Hour & 24-Hour Normalization**: Automatically converts formats like `9:00 AM`, `9am`, `02:30 PM`, `2pm` into standardized `HH:MM` 24-hour time.
+  - **Fuzzy Faculty Matching & Quick-Select Dropdown**: Matches faculty names against registered directory; unknown names render an inline `<select>` containing all current faculty for 1-click administrative resolution.
+  - **Intra-File & Database Overlap Detection**: Detects self-overlap collisions between rows in the same CSV as well as conflicts with existing database records.
+- **Staging Table & Pre-Commit Correction Toolbar (`admin.html`)**:
+  - **Commit Modes**: Toggle between **Append** (keeps existing timetables) and **Replace Faculty** (cleans existing weekly schedules for professors present in the uploaded file before insertion).
+  - **Filter Statistics Buttons**: Filter staged rows by *All Rows*, *Ready / Valid*, and *Needs Attention*.
+  - **Action Tools**: "Auto-Fix Formats" (trims whitespace, formats times) and "Remove Errors" (purges unresolvable entries to permit immediate commit).
+  - Calculated duration pills displayed live for each staged entry.
+- **Timetable Import Audit History Upgrade (`admin.html` & `js/admin.js`)**:
+  - Dynamic filter panel: filter logs by File Type (All / CSV / PDF), Status (Success / Partial / Failed), and debounced search query.
+  - Formatted timestamps, row statistics, and individual deletion or full log clearing capabilities.
+- **Timetable Service Bulk Insert Upgrade (`js/timetable-service.js`)**:
+  - Enhanced `batchImportTimetables(records, options)` with support for `replace_faculty` mode and PostgreSQL bulk array insertion with error fallback.
+
+---
+
+## [v0.5.0] - 2026-09-20 - Milestone 5: Central Availability & Overrides Engine
+
+### Added
+- **Centralized Availability Service Layer (`js/availability-service.js`)**:
+  - Full CRUD operations for manual faculty status and temporary schedule overrides (`availability` and `availability_overrides` tables) with live Supabase client querying and offline local storage fallback.
+  - **Authoritative 5-Tier Precedence Engine**:
+    - **Tier 1 (Inactive Profile Guard)**: Flags de-activated accounts as paused and unavailable campus-wide.
+    - **Tier 2 (Date-Specific Schedule Overrides)**: Resolves active overrides on the target date within the `[start_time, end_time)` window with absolute priority.
+    - **Tier 3 (Weekly Timetables)**: Resolves scheduled recurring lectures, classes, or labs for the matching day of week.
+    - **Tier 4 (Manual Faculty Status)**: Resolves the professor's last posted explicit status (`available`, `present`, `in_meeting`, `unavailable`) with relative timestamp calculations (e.g. "Updated 10m ago").
+    - **Tier 5 (Default Fallback)**: Returns default available/standby status when no other condition applies.
+  - **Override Collision Engine & Validation Guard**:
+    - **Positive Window Constraint**: Enforces `end_time > start_time` with standard 24h `HH:MM` format.
+    - **Duration Sanity Bounds**: Checks minimum (15m) and maximum (12h) duration constraints with interactive duration badge calculations.
+    - **Self-Override Overlap Prevention**: Prevents duplicate or overlapping overrides for the same faculty member on the same calendar day.
+    - **Timetable Collision Advisory**: Detects whether an override replaces or conflicts with a regular scheduled timetable class and provides an advisory warning for the faculty/admin.
+  - **Real-Time Supabase Synchronization**:
+    - Channels subscribed to `availability` and `availability_overrides` with live broadcast and local `window.dispatchEvent` fallback.
+- **Admin Dashboard Availability & Overrides Management (`admin.html` & `js/admin.js`)**:
+  - **Live Campus-Wide Status Table**: Real-time overview of all faculty with source indicators (`Override`, `Class`, `Manual`, `Paused`), active notes, and instant text search.
+  - **Campus Override Creation & Editing Form**: Admin override authoring with live duration badge, validation alerts, and full CRUD.
+  - **Filter Bar & Timeline Badges**: Filter overrides by faculty, status, and timeline (*Active Now*, *Today & Upcoming*, *Today Only*, *Past*).
+- **Faculty Dashboard Integration (`faculty.html` & `js/faculty.js`)**:
+  - Manual status switcher integrated with `AvailabilityService.updateManualStatus()` with real-time feedback and last-updated timestamp.
+  - Override management upgraded with live collision checking, duration metrics, and timeline badges.
+- **Student Dashboard Integration (`student.html` & `js/student.js`)**:
+  - Faculty cards show resolved status with priority source tags (`[Override]`, `[Timetable]`, `[Manual]`, `[Inactive]`).
+  - **Availability Status Breakdown Modal**: Dedicated dialog revealing the exact rule applied, location, notes, and time window for any specified date and time query.
+  - Bound to reactive `availability-data-changed` and `override-data-changed` events.
+
+---
+
 ## [v0.4.0] - 2026-09-20 - Milestone 4: Timetable Engine & Validation
 
 ### Added

@@ -308,11 +308,40 @@
 
         <!-- Preview & Correction Area -->
         <div id="import-preview-section" style="display: none;">
-          <div class="card-header" style="border-top: 1px solid var(--border-color); padding-top: 1rem;">
-            <h3>Staged Timetable Records (Verification & Correction)</h3>
-            <div style="display: flex; gap: 0.5rem;">
+          <div class="card-header" style="border-top: 1px solid var(--border-color); padding-top: 1.25rem; flex-wrap: wrap; gap: 1rem;">
+            <div>
+              <h3>Staged Timetable Records (Verification & Correction)</h3>
+              <div style="font-size: 0.8125rem; color: var(--text-muted);">
+                Review records, select faculty from dropdowns if needed, adjust cells inline, and choose your commit mode.
+              </div>
+            </div>
+            <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
               <button id="btn-cancel-import" class="btn btn-secondary btn-sm">Discard</button>
               <button id="btn-confirm-import" class="btn btn-primary btn-sm">Confirm & Commit Import</button>
+            </div>
+          </div>
+
+          <!-- Staged Controls Toolbar -->
+          <div style="background: var(--surface-muted); padding: 0.85rem; border-radius: var(--radius-sm); margin-bottom: 1rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem;">
+            <div style="display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;">
+              <div style="display: flex; align-items: center; gap: 0.4rem;">
+                <label for="import-mode-select" style="font-size: 0.8125rem; font-weight: 600; margin: 0;">Mode:</label>
+                <select id="import-mode-select" class="form-control" style="font-size: 0.8125rem; padding: 0.25rem 0.5rem; width: auto;">
+                  <option value="append" selected>Append (Keep existing schedules)</option>
+                  <option value="replace_faculty">Replace (Overwrite for uploaded faculty)</option>
+                </select>
+              </div>
+
+              <div style="display: flex; gap: 0.35rem;">
+                <button id="filter-staged-all" class="btn btn-secondary btn-sm" style="font-size: 0.75rem; padding: 0.25rem 0.5rem;">All Rows (0)</button>
+                <button id="filter-staged-valid" class="btn btn-secondary btn-sm" style="font-size: 0.75rem; padding: 0.25rem 0.5rem;">Ready / Valid (0)</button>
+                <button id="filter-staged-errors" class="btn btn-secondary btn-sm" style="font-size: 0.75rem; padding: 0.25rem 0.5rem;">Needs Attention (0)</button>
+              </div>
+            </div>
+
+            <div style="display: flex; gap: 0.5rem;">
+              <button id="btn-autofix-staged" class="btn btn-secondary btn-sm" style="font-size: 0.75rem;">⚡ Auto-Fix Formats</button>
+              <button id="btn-remove-errors" class="btn btn-secondary btn-sm" style="font-size: 0.75rem; color: var(--danger);">✕ Remove Errors</button>
             </div>
           </div>
 
@@ -322,14 +351,14 @@
             <table>
               <thead>
                 <tr>
-                  <th>Faculty Name</th>
+                  <th style="min-width: 200px;">Faculty Member</th>
                   <th>Day</th>
-                  <th>Start</th>
-                  <th>End</th>
-                  <th>Activity</th>
-                  <th>Room</th>
+                  <th style="width: 85px;">Start</th>
+                  <th style="width: 85px;">End</th>
+                  <th style="min-width: 150px;">Activity / Course</th>
+                  <th style="width: 100px;">Room</th>
                   <th>Status</th>
-                  <th style="width: 50px;">Remove</th>
+                  <th style="width: 50px; text-align: center;">Action</th>
                 </tr>
               </thead>
               <tbody id="import-preview-body">
@@ -500,12 +529,42 @@
     <!-- ========================================================== -->
     <section id="section-history" class="admin-section" style="display: none;">
       <div class="card">
-        <div class="card-header">
+        <div class="card-header" style="flex-wrap: wrap; gap: 0.75rem;">
           <div>
             <h2>Timetable Import Audit History</h2>
             <div class="card-subtitle" style="margin-top: 0.25rem;">
-              Permanent audit log of all batch file uploads, row statistics, and completion statuses.
+              Permanent PostgreSQL audit log of all batch file uploads, row statistics, and completion statuses.
             </div>
+          </div>
+          <div style="display: flex; gap: 0.5rem;">
+            <button id="btn-refresh-imports" class="btn btn-secondary btn-sm">Refresh Logs</button>
+            <button id="btn-clear-imports" class="btn btn-secondary btn-sm" style="color: var(--danger);">Clear Log History</button>
+          </div>
+        </div>
+
+        <!-- History Filters -->
+        <div style="background: var(--surface-muted); padding: 0.75rem; border-radius: var(--radius-sm); margin-bottom: 1rem; display: flex; gap: 0.75rem; flex-wrap: wrap; align-items: center;">
+          <div style="display: flex; align-items: center; gap: 0.4rem;">
+            <label for="import-filter-type" style="font-size: 0.8125rem; font-weight: 600; margin: 0;">Type:</label>
+            <select id="import-filter-type" class="form-control" style="font-size: 0.8125rem; padding: 0.25rem 0.5rem; width: auto;">
+              <option value="all">All Formats</option>
+              <option value="csv">CSV Only</option>
+              <option value="pdf">PDF Only</option>
+            </select>
+          </div>
+
+          <div style="display: flex; align-items: center; gap: 0.4rem;">
+            <label for="import-filter-status" style="font-size: 0.8125rem; font-weight: 600; margin: 0;">Status:</label>
+            <select id="import-filter-status" class="form-control" style="font-size: 0.8125rem; padding: 0.25rem 0.5rem; width: auto;">
+              <option value="all">All Statuses</option>
+              <option value="success">Success</option>
+              <option value="partial">Partial</option>
+              <option value="failed">Failed</option>
+            </select>
+          </div>
+
+          <div style="flex: 1; min-width: 200px;">
+            <input type="text" id="import-search-query" class="form-control" style="font-size: 0.8125rem; padding: 0.25rem 0.5rem;" placeholder="Search by file name or uploader...">
           </div>
         </div>
 
@@ -519,7 +578,8 @@
                 <th>Rows Detected</th>
                 <th>Rows Imported</th>
                 <th>Status</th>
-                <th>Date</th>
+                <th>Timestamp</th>
+                <th style="width: 80px; text-align: center;">Actions</th>
               </tr>
             </thead>
             <tbody id="import-history-body">
@@ -551,6 +611,7 @@
   <script src="js/faculty-service.js"></script>
   <script src="js/timetable-service.js"></script>
   <script src="js/availability-service.js"></script>
+  <script src="js/import-service.js"></script>
   <script src="js/admin.js"></script>
   <script src="js/timetable-import.js"></script>
 </body>
