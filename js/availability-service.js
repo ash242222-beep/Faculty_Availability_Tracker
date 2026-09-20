@@ -573,21 +573,16 @@
    * @param {string} time HH:MM (24-hr)
    * @returns {Object} Structured availability resolution
    */
-  function resolveFacultyAvailability(facultyId, date, time) {
+  function resolveFacultyAvailability(facultyId, date, time, facultyObj = null) {
     const store = window.DataStore ? window.DataStore.getStore() : {};
     const facultyList = store.faculty || [];
-    const faculty = facultyList.find(f => f.id === facultyId);
-
-    if (!faculty) {
-      return {
-        status: 'not_updated',
-        activity: null,
-        room: null,
-        note: 'Faculty member not found',
-        source: 'not_updated',
-        ruleSummary: 'No matching faculty record.'
-      };
-    }
+    const faculty = facultyObj || facultyList.find(f => f.id === facultyId) || {
+      id: facultyId,
+      full_name: 'Faculty Member',
+      department: 'General',
+      room: 'Campus Cabin',
+      is_active: true
+    };
 
     // Tier 1: Inactive Account Check
     if (faculty.is_active === false) {

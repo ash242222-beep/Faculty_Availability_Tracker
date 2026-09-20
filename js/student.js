@@ -4,8 +4,7 @@
  */
 
 document.addEventListener('DOMContentLoaded', () => {
-  // Check auth - allows student, faculty, admin to browse
-  Auth.requireRole(['student', 'faculty', 'admin']);
+  // Initialize user header if logged in (allows guest browsing)
   Auth.initHeaderAuth();
 
   const searchInput = document.getElementById('search-input');
@@ -74,7 +73,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
       facultyCardsGrid.innerHTML = facultyList.map(faculty => {
         // Calculate current real-time availability for target date & time
-        const avail = window.Utils.getFacultyAvailability(faculty.id, queryDate, queryTime);
+        const avail = window.Utils.getFacultyAvailability(faculty.id, queryDate, queryTime, faculty);
         const statusBadge = window.Utils.renderStatusBadge(avail.status);
 
         let contextNote = '';

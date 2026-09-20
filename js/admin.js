@@ -23,6 +23,9 @@ document.addEventListener('DOMContentLoaded', () => {
         btn.classList.remove('active');
       }
     });
+    if (sectionId === 'section-availability') {
+      renderFacultyAvailabilityOverview();
+    }
   }
 
   tabButtons.forEach(btn => {
@@ -557,14 +560,27 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   // ==========================================================
-  // SECTION 4: AVAILABILITY & OVERRIDES MANAGEMENT
+  // SECTION 4: AVAILABILITY OVERVIEW (SIMPLE & INTUITIVE)
   // ==========================================================
-  const adminAvailBody = document.getElementById('admin-availability-body');
-  const adminOverridesBody = document.getElementById('admin-overrides-body');
-  const btnRefreshAvail = document.getElementById('btn-refresh-availability-admin');
+  const adminCardsGrid = document.getElementById('admin-faculty-cards-grid');
+  const adminAvailEmptyState = document.getElementById('admin-avail-empty-state');
   const adminAvailSearch = document.getElementById('admin-avail-search');
+  const adminAvailDept = document.getElementById('admin-avail-dept');
+  const adminAvailDate = document.getElementById('admin-avail-date');
+  const adminAvailTime = document.getElementById('admin-avail-time');
+  const btnAdminAvailNow = document.getElementById('btn-admin-avail-now');
+  const btnCheckAdminAvail = document.getElementById('btn-check-admin-avail');
+  const btnRefreshAvail = document.getElementById('btn-refresh-availability-admin');
 
-  // Override Form elements
+  // Metric stat elements
+  const statTotalFaculty = document.getElementById('stat-total-faculty');
+  const statAvailCount = document.getElementById('stat-avail-count');
+  const statClassCount = document.getElementById('stat-class-count');
+  const statBusyCount = document.getElementById('stat-busy-count');
+  const adminAvailTimeBanner = document.getElementById('admin-avail-time-banner');
+
+  // Override Form elements (advanced)
+  const adminOverridesBody = document.getElementById('admin-overrides-body');
   const adminOvForm = document.getElementById('admin-override-form');
   const adminOvFormTitle = document.getElementById('admin-override-form-title');
   const adminOvEditId = document.getElementById('admin-ov-edit-id');
@@ -585,158 +601,295 @@ document.addEventListener('DOMContentLoaded', () => {
   const adminOvFilterTiming = document.getElementById('admin-ov-filter-timing');
   const adminOvCountBadge = document.getElementById('admin-ov-count-badge');
 
-  // Set default date to today
-  if (adminOvDate && !adminOvDate.value) {
-    adminOvDate.value = new Date().toISOString().split('T')[0];
+  // Set default date to today and time to current time
+  const initNow = new Date();
+  const initTodayStr = initNow.toISOString().split('T')[0];
+  const initHours = String(initNow.getHours()).padStart(2, '0');
+  const initMinutes = String(initNow.getMinutes()).padStart(2, '0');
+
+  if (adminAvailDate && !adminAvailDate.value) adminAvailDate.value = initTodayStr;
+  if (adminAvailTime && !adminAvailTime.value) adminAvailTime.value = `${initHours}:${initMinutes}`;
+  if (adminOvDate && !adminOvDate.value) adminOvDate.value = initTodayStr;
+
+  // Populate department filter
+  if (adminAvailDept && window.APP_CONFIG && Array.isArray(window.APP_CONFIG.DEPARTMENTS)) {
+    adminAvailDept.innerHTML = window.APP_CONFIG.DEPARTMENTS.map(dept => 
+      `<option value="${dept}">${dept}</option>`
+    ).join('');
   }
 
-  // Populate override faculty select & filter
-  async function populateOverrideFacultySelects() {
-    try {
-      const facultyList = await window.FacultyService.getAllFaculty();
-      if (adminOvFaculty) {
-        const currentVal = adminOvFaculty.value;
-        adminOvFaculty.innerHTML = '<option value="">-- Select Faculty Member --</option>' +
-          facultyList.map(f => `<option value="${f.id}">${f.full_name} (${f.department})</option>`).join('');
-        if (currentVal) adminOvFaculty.value = currentVal;
-      }
+  // Currently loaded faculty cache
+  let currentLoadedFaculty = [];
 
-      if (adminOvFilterFaculty) {
-        const currentVal = adminOvFilterFaculty.value;
-        adminOvFilterFaculty.innerHTML = '<option value="all">All Faculty</option>' +
-          facultyList.map(f => `<option value="${f.id}">${f.full_name}</option>`).join('');
-        if (currentVal) adminOvFilterFaculty.value = currentVal;
-      }
-    } catch (err) {
-      console.error('Error loading faculty for overrides:', err);
-    }
-  }
-
-  // Check live validation on admin override form
-  function checkLiveAdminOvValidation() {
-    if (!adminOvFaculty || !adminOvDate || !adminOvStart || !adminOvEnd) return;
-
-    const start = adminOvStart.value;
-    const end = adminOvEnd.value;
-    const date = adminOvDate.value;
-    const facultyId = adminOvFaculty.value;
-    const editId = adminOvEditId.value || null;
-
-    if (adminOvDurationBadge && start && end) {
-      adminOvDurationBadge.textContent = `Duration: ${window.Utils.calculateDuration(start, end)}`;
-    }
-
-    if (!adminOvValidationAlert) return;
-
-    if (!facultyId || !date || !start || !end) {
-      adminOvValidationAlert.style.display = 'none';
-      return;
-    }
-
-    const valResult = window.AvailabilityService.validateOverride({
-      faculty_id: facultyId,
-      date: date,
-      start_time: start,
-      end_time: end,
-      status: adminOvStatus ? adminOvStatus.value : 'available',
-      note: adminOvNote ? adminOvNote.value : ''
-    }, editId);
-
-    if (!valResult.isValid) {
-      adminOvValidationAlert.style.display = 'block';
-      adminOvValidationAlert.style.background = '#fef2f2';
-      adminOvValidationAlert.style.color = '#991b1b';
-      adminOvValidationAlert.style.border = '1px solid #fecaca';
-      adminOvValidationAlert.innerHTML = `<strong>Validation Error:</strong> ${valResult.errors.join('<br>')}`;
-    } else if (valResult.warnings.length > 0) {
-      adminOvValidationAlert.style.display = 'block';
-      adminOvValidationAlert.style.background = '#fffbeb';
-      adminOvValidationAlert.style.color = '#92400e';
-      adminOvValidationAlert.style.border = '1px solid #fde68a';
-      adminOvValidationAlert.innerHTML = `<strong>Notice:</strong> ${valResult.warnings.join('<br>')}`;
-    } else {
-      adminOvValidationAlert.style.display = 'block';
-      adminOvValidationAlert.style.background = '#f0fdf4';
-      adminOvValidationAlert.style.color = '#166534';
-      adminOvValidationAlert.style.border = '1px solid #bbf7d0';
-      adminOvValidationAlert.innerHTML = '<strong>Verified:</strong> No timing conflicts or overlapping overrides detected.';
-    }
-  }
-
-  if (adminOvFaculty) adminOvFaculty.addEventListener('change', checkLiveAdminOvValidation);
-  if (adminOvDate) adminOvDate.addEventListener('change', checkLiveAdminOvValidation);
-  if (adminOvStart) adminOvStart.addEventListener('input', checkLiveAdminOvValidation);
-  if (adminOvEnd) adminOvEnd.addEventListener('input', checkLiveAdminOvValidation);
-  if (adminOvStatus) adminOvStatus.addEventListener('change', checkLiveAdminOvValidation);
-
-  // Render Faculty Status Overview
-  async function renderFacultyStatusOverview() {
-    if (!adminAvailBody) return;
+  // Render Faculty Availability Cards (Simple & Intuitive like Student Portal)
+  async function renderFacultyAvailabilityOverview() {
+    if (!adminCardsGrid) return;
 
     try {
-      const facultyList = await window.FacultyService.getAllFaculty();
-      const searchQuery = (adminAvailSearch ? adminAvailSearch.value : '').toLowerCase().trim();
+      const query = (adminAvailSearch ? adminAvailSearch.value : '').toLowerCase().trim();
+      const selectedDept = adminAvailDept ? adminAvailDept.value : 'All Departments';
+      const dateVal = (adminAvailDate && adminAvailDate.value) ? adminAvailDate.value : new Date().toISOString().split('T')[0];
+      const timeVal = (adminAvailTime && adminAvailTime.value) ? adminAvailTime.value : '10:00';
 
-      const filteredFaculty = facultyList.filter(f => {
-        if (!searchQuery) return true;
-        return f.full_name.toLowerCase().includes(searchQuery) ||
-               (f.department && f.department.toLowerCase().includes(searchQuery)) ||
-               (f.room && f.room.toLowerCase().includes(searchQuery));
+      // Update banner with formatted date & time
+      if (adminAvailTimeBanner) {
+        const dObj = new Date(dateVal + 'T' + timeVal);
+        const dateFormatted = isNaN(dObj.getTime()) ? dateVal : dObj.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+        adminAvailTimeBanner.textContent = `Status evaluated for ${dateFormatted} at ${window.Utils.formatTime12Hour(timeVal)}`;
+      }
+
+      // Fetch all faculty members
+      const facultyList = await window.FacultyService.getAllFaculty();
+      currentLoadedFaculty = facultyList;
+
+      // Filter by department and search query
+      const filtered = facultyList.filter(f => {
+        const matchesDept = (selectedDept === 'All Departments') || (f.department === selectedDept);
+        if (!matchesDept) return false;
+
+        if (!query) return true;
+        const nameMatch = (f.full_name || '').toLowerCase().includes(query);
+        const deptMatch = (f.department || '').toLowerCase().includes(query);
+        const desigMatch = (f.designation || '').toLowerCase().includes(query);
+        const roomMatch = (f.room || '').toLowerCase().includes(query);
+        const emailMatch = (f.email || '').toLowerCase().includes(query);
+        return nameMatch || deptMatch || desigMatch || roomMatch || emailMatch;
       });
 
-      const now = new Date();
-      const today = now.toISOString().split('T')[0];
-      const currentTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+      // Update stat counters
+      let countAvail = 0;
+      let countClass = 0;
+      let countBusy = 0;
 
-      if (filteredFaculty.length === 0) {
-        adminAvailBody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: var(--text-muted); padding: 1.5rem;">No matching faculty found.</td></tr>`;
+      filtered.forEach(f => {
+        const avail = window.Utils.getFacultyAvailability(f.id, dateVal, timeVal, f);
+        if (avail.status === 'available' || avail.status === 'present') countAvail++;
+        else if (avail.status === 'in_class') countClass++;
+        else if (avail.status === 'in_meeting' || avail.status === 'unavailable') countBusy++;
+      });
+
+      if (statTotalFaculty) statTotalFaculty.textContent = filtered.length;
+      if (statAvailCount) statAvailCount.textContent = countAvail;
+      if (statClassCount) statClassCount.textContent = countClass;
+      if (statBusyCount) statBusyCount.textContent = countBusy;
+
+      if (filtered.length === 0) {
+        adminCardsGrid.innerHTML = '';
+        if (adminAvailEmptyState) adminAvailEmptyState.style.display = 'block';
         return;
       }
 
-      adminAvailBody.innerHTML = filteredFaculty.map(f => {
-        const avail = window.AvailabilityService.resolveFacultyAvailability(f.id, today, currentTime);
+      if (adminAvailEmptyState) adminAvailEmptyState.style.display = 'none';
+
+      // Render cards
+      adminCardsGrid.innerHTML = filtered.map(faculty => {
+        const avail = window.Utils.getFacultyAvailability(faculty.id, dateVal, timeVal, faculty);
         const statusBadge = window.Utils.renderStatusBadge(avail.status);
 
-        let sourceLabel = '';
+        let sourceBadge = '';
         if (avail.source === 'override') {
-          sourceLabel = `<span class="badge-status badge-in_meeting" style="font-size: 0.7rem;">Override</span>`;
+          sourceBadge = `<span class="badge-status badge-in_meeting" style="font-size: 0.7rem;">Active Override</span>`;
         } else if (avail.source === 'timetable') {
-          sourceLabel = `<span class="badge-status badge-in_class" style="font-size: 0.7rem;">Class</span>`;
+          sourceBadge = `<span class="badge-status badge-in_class" style="font-size: 0.7rem;">Class Timetable</span>`;
         } else if (avail.source === 'manual_status') {
-          sourceLabel = `<span class="badge-status badge-present" style="font-size: 0.7rem;">Manual</span>`;
+          sourceBadge = `<span class="badge-status badge-present" style="font-size: 0.7rem;">Faculty Check-in</span>`;
         } else if (avail.source === 'inactive_account') {
-          sourceLabel = `<span class="badge-status badge-unavailable" style="font-size: 0.7rem;">Paused</span>`;
+          sourceBadge = `<span class="badge-status badge-unavailable" style="font-size: 0.7rem;">Account Inactive</span>`;
         } else {
-          sourceLabel = `<span class="badge-status badge-not_updated" style="font-size: 0.7rem;">None</span>`;
+          sourceBadge = `<span class="badge-status badge-not_updated" style="font-size: 0.7rem;">Default</span>`;
         }
 
-        let detailText = '—';
-        if (avail.source === 'override') {
-          detailText = `Window: ${avail.overrideWindow}${avail.note ? ` (${avail.note})` : ''}`;
-        } else if (avail.source === 'timetable') {
-          detailText = `${avail.activity} in ${avail.room} (${avail.scheduleWindow})`;
+        let contextText = '';
+        if (avail.source === 'timetable') {
+          contextText = `<strong>Class:</strong> ${avail.activity} &bull; Room: <strong>${avail.room || 'TBD'}</strong> (${avail.scheduleWindow || ''})`;
+        } else if (avail.source === 'override') {
+          contextText = `<strong>Override:</strong> ${avail.note || 'Special schedule posted'} (${avail.overrideWindow || ''})`;
         } else if (avail.note) {
-          detailText = avail.note;
+          contextText = `<strong>Note:</strong> "${avail.note}"`;
+        } else if (avail.status === 'available' || avail.status === 'present') {
+          contextText = `Free and available in cabin for meetings / doubt sessions`;
+        } else {
+          contextText = `No scheduled classes during this time period`;
         }
 
-        const lastUpdated = avail.timeAgoText || (avail.updatedAt ? new Date(avail.updatedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Today');
+        const isPaused = faculty.is_active === false;
 
         return `
-          <tr>
-            <td><strong>${f.full_name}</strong></td>
-            <td>${f.department}</td>
-            <td>${f.room}</td>
-            <td>${statusBadge}</td>
-            <td>${sourceLabel}</td>
-            <td><span style="font-size: 0.85rem;">${detailText}</span></td>
-            <td><span style="font-size: 0.8125rem; color: var(--text-muted);">${lastUpdated}</span></td>
-          </tr>
+          <div class="faculty-card card" id="admin-card-faculty-${faculty.id}" style="margin-bottom: 0; display: flex; flex-direction: column; justify-content: space-between; border-radius: var(--radius-md); box-shadow: var(--shadow-sm); border: 1px solid var(--border-color); opacity: ${isPaused ? '0.8' : '1'};">
+            <div>
+              <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 0.75rem; margin-bottom: 0.75rem;">
+                <div>
+                  <h3 style="font-size: 1.05rem; font-weight: 700; margin-bottom: 0.2rem; color: var(--text-main);">
+                    ${faculty.full_name}
+                    ${isPaused ? '<span class="badge-status badge-unavailable" style="font-size: 0.7rem; margin-left: 0.35rem;">Paused</span>' : ''}
+                  </h3>
+                  <div style="font-size: 0.8125rem; color: var(--text-muted); font-weight: 500;">
+                    ${faculty.designation || 'Faculty'} &bull; ${faculty.department || 'General'}
+                  </div>
+                </div>
+                <div>
+                  ${statusBadge}
+                </div>
+              </div>
+
+              <!-- Location & Contact Grid -->
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; background: var(--surface-muted); padding: 0.625rem 0.75rem; border-radius: var(--radius-sm); font-size: 0.8125rem; margin-bottom: 0.75rem; border: 1px solid var(--border-color);">
+                <div>
+                  <span style="color: var(--text-muted); display: block; font-size: 0.7rem; text-transform: uppercase; font-weight: 600;">Office / Cabin</span>
+                  <strong style="color: var(--text-main);">${faculty.room || 'Not Assigned'}</strong>
+                </div>
+                <div>
+                  <span style="color: var(--text-muted); display: block; font-size: 0.7rem; text-transform: uppercase; font-weight: 600;">Email</span>
+                  <a href="mailto:${faculty.email}" style="color: var(--primary); text-decoration: none; word-break: break-all;">${faculty.email || '—'}</a>
+                </div>
+              </div>
+
+              <!-- Real-time Status Card -->
+              <div style="padding: 0.625rem 0.75rem; background: #fff; border-radius: var(--radius-sm); border: 1px solid var(--border-color); margin-bottom: 0.875rem; font-size: 0.8125rem;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.25rem;">
+                  <span style="font-size: 0.725rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase;">
+                    Status @ ${window.Utils.formatTime12Hour(timeVal)}
+                  </span>
+                  ${sourceBadge}
+                </div>
+                <div style="color: var(--text-main); line-height: 1.4;">
+                  ${contextText}
+                </div>
+              </div>
+            </div>
+
+            <!-- Card Action Buttons -->
+            <div style="display: flex; gap: 0.5rem; border-top: 1px solid var(--border-color); padding-top: 0.75rem;">
+              <button type="button" class="btn btn-secondary btn-sm" style="flex: 1.2; justify-content: center;" onclick="window.adminViewTimetable('${faculty.id}')">
+                📅 View Timetable
+              </button>
+              <button type="button" class="btn btn-secondary btn-sm" style="flex: 1; justify-content: center;" onclick="window.adminQuickCheck('${faculty.id}')">
+                🔍 Details
+              </button>
+            </div>
+          </div>
         `;
       }).join('');
+
     } catch (err) {
-      console.error('Error rendering faculty status overview:', err);
+      console.error('Error rendering faculty availability overview:', err);
     }
   }
+
+  // Admin View Weekly Timetable Modal
+  window.adminViewTimetable = async function(facultyId) {
+    const faculty = currentLoadedFaculty.find(f => f.id === facultyId) || { full_name: 'Faculty Member' };
+    const modal = document.getElementById('admin-timetable-modal');
+    const nameElem = document.getElementById('admin-modal-faculty-name');
+    const bodyElem = document.getElementById('admin-modal-timetable-body');
+
+    if (!modal || !bodyElem) return;
+
+    if (nameElem) {
+      nameElem.textContent = `${faculty.full_name} (${faculty.department || ''}) — Cabin: ${faculty.room || 'N/A'}`;
+    }
+
+    bodyElem.innerHTML = '<tr><td colspan="4" style="text-align: center; padding: 1.5rem; color: var(--text-muted);">Loading weekly timetable...</td></tr>';
+    modal.style.display = 'flex';
+
+    try {
+      let slots = [];
+      if (window.TimetableService && typeof window.TimetableService.getTimetablesByFaculty === 'function') {
+        slots = await window.TimetableService.getTimetablesByFaculty(facultyId);
+      } else {
+        const store = window.DataStore ? window.DataStore.getStore() : { timetables: [] };
+        slots = (store.timetables || []).filter(t => t.faculty_id === facultyId);
+      }
+
+      if (!slots || slots.length === 0) {
+        bodyElem.innerHTML = '<tr><td colspan="4" style="text-align: center; padding: 2rem; color: var(--text-muted);">No weekly scheduled classes found for this faculty member.</td></tr>';
+        return;
+      }
+
+      const dayOrder = { 'Monday': 1, 'Tuesday': 2, 'Wednesday': 3, 'Thursday': 4, 'Friday': 5, 'Saturday': 6, 'Sunday': 7 };
+      slots.sort((a, b) => {
+        const dayDiff = (dayOrder[a.day_of_week] || 99) - (dayOrder[b.day_of_week] || 99);
+        if (dayDiff !== 0) return dayDiff;
+        return (a.start_time || '').localeCompare(b.start_time || '');
+      });
+
+      bodyElem.innerHTML = slots.map(slot => `
+        <tr>
+          <td><strong style="color: var(--text-main);">${slot.day_of_week}</strong></td>
+          <td>${slot.start_time} - ${slot.end_time}</td>
+          <td><strong style="color: var(--primary);">${slot.subject}</strong></td>
+          <td>${slot.room || faculty.room || 'Campus Room'}</td>
+        </tr>
+      `).join('');
+    } catch (err) {
+      bodyElem.innerHTML = `<tr><td colspan="4" style="text-align: center; color: var(--danger); padding: 1.5rem;">Failed to load timetable: ${err.message}</td></tr>`;
+    }
+  };
+
+  // Admin Quick Check Breakdown Modal
+  window.adminQuickCheck = function(facultyId) {
+    const faculty = currentLoadedFaculty.find(f => f.id === facultyId) || { full_name: 'Faculty Member' };
+    const dateVal = (adminAvailDate && adminAvailDate.value) ? adminAvailDate.value : new Date().toISOString().split('T')[0];
+    const timeVal = (adminAvailTime && adminAvailTime.value) ? adminAvailTime.value : '10:00';
+
+    const avail = window.Utils.getFacultyAvailability(facultyId, dateVal, timeVal, faculty);
+    const modal = document.getElementById('admin-availability-breakdown-modal');
+    const titleElem = document.getElementById('admin-breakdown-faculty-title');
+    const contentElem = document.getElementById('admin-breakdown-modal-content');
+
+    if (!modal || !contentElem) return;
+
+    if (titleElem) {
+      titleElem.textContent = `${faculty.full_name} (${faculty.department || 'General'})`;
+    }
+
+    const statusBadge = window.Utils.renderStatusBadge(avail.status);
+
+    contentElem.innerHTML = `
+      <div style="margin-bottom: 1rem; text-align: center;">
+        <div style="margin-bottom: 0.5rem;">${statusBadge}</div>
+        <div style="font-size: 0.875rem; color: var(--text-muted);">
+          Resolution for <strong>${dateVal}</strong> at <strong>${window.Utils.formatTime12Hour(timeVal)}</strong>
+        </div>
+      </div>
+
+      <div style="background: var(--surface-muted); padding: 1rem; border-radius: var(--radius-sm); border: 1px solid var(--border-color); font-size: 0.85rem; line-height: 1.6;">
+        <div><strong>Rule Applied:</strong> Tier ${avail.ruleTier || '—'} (${avail.source || 'default'})</div>
+        <div><strong>Office / Cabin:</strong> ${faculty.room || 'Not Assigned'}</div>
+        ${avail.activity ? `<div><strong>Scheduled Activity:</strong> ${avail.activity}</div>` : ''}
+        ${avail.room ? `<div><strong>Venue:</strong> ${avail.room}</div>` : ''}
+        ${avail.note ? `<div><strong>Status Note:</strong> "${avail.note}"</div>` : ''}
+        ${avail.overrideWindow ? `<div><strong>Override Window:</strong> ${avail.overrideWindow}</div>` : ''}
+        ${avail.scheduleWindow ? `<div><strong>Class Window:</strong> ${avail.scheduleWindow}</div>` : ''}
+      </div>
+    `;
+
+    modal.style.display = 'flex';
+  };
+
+  // Modal close handlers
+  const closeAdminTtModal = document.getElementById('close-admin-timetable-modal');
+  if (closeAdminTtModal) {
+    closeAdminTtModal.addEventListener('click', () => {
+      const modal = document.getElementById('admin-timetable-modal');
+      if (modal) modal.style.display = 'none';
+    });
+  }
+
+  const closeAdminBdModal = document.getElementById('close-admin-breakdown-modal');
+  if (closeAdminBdModal) {
+    closeAdminBdModal.addEventListener('click', () => {
+      const modal = document.getElementById('admin-availability-breakdown-modal');
+      if (modal) modal.style.display = 'none';
+    });
+  }
+
+  window.addEventListener('click', (e) => {
+    const ttModal = document.getElementById('admin-timetable-modal');
+    if (ttModal && e.target === ttModal) ttModal.style.display = 'none';
+    const bdModal = document.getElementById('admin-availability-breakdown-modal');
+    if (bdModal && e.target === bdModal) bdModal.style.display = 'none';
+  });
 
   // Render Overrides Table
   async function renderOverridesAdmin() {
@@ -954,11 +1107,30 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   };
 
-  // Filter change listeners
+  // Filter change listeners for availability overview
+  if (adminAvailSearch) adminAvailSearch.addEventListener('input', renderFacultyAvailabilityOverview);
+  if (adminAvailDept) adminAvailDept.addEventListener('change', renderFacultyAvailabilityOverview);
+  if (adminAvailDate) adminAvailDate.addEventListener('change', renderFacultyAvailabilityOverview);
+  if (adminAvailTime) adminAvailTime.addEventListener('input', renderFacultyAvailabilityOverview);
+  if (btnCheckAdminAvail) btnCheckAdminAvail.addEventListener('click', renderFacultyAvailabilityOverview);
+
+  if (btnAdminAvailNow) {
+    btnAdminAvailNow.addEventListener('click', () => {
+      const n = new Date();
+      if (adminAvailDate) adminAvailDate.value = n.toISOString().split('T')[0];
+      if (adminAvailTime) {
+        const hh = String(n.getHours()).padStart(2, '0');
+        const mm = String(n.getMinutes()).padStart(2, '0');
+        adminAvailTime.value = `${hh}:${mm}`;
+      }
+      renderFacultyAvailabilityOverview();
+    });
+  }
+
+  // Filter change listeners for overrides
   if (adminOvFilterFaculty) adminOvFilterFaculty.addEventListener('change', renderOverridesAdmin);
   if (adminOvFilterStatus) adminOvFilterStatus.addEventListener('change', renderOverridesAdmin);
   if (adminOvFilterTiming) adminOvFilterTiming.addEventListener('change', renderOverridesAdmin);
-  if (adminAvailSearch) adminAvailSearch.addEventListener('input', renderFacultyStatusOverview);
   if (btnRefreshAvail) btnRefreshAvail.addEventListener('click', renderAvailabilityAdmin);
 
   // Global change listeners for real-time reactivity

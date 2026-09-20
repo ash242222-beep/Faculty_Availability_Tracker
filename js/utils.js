@@ -95,15 +95,15 @@ function isTimeOverlap(startA, endA, startB, endB) {
  *   source: "inactive_account" | "override" | "timetable" | "manual_status" | "not_updated"
  * }
  */
-function getFacultyAvailability(facultyId, date, time) {
+function getFacultyAvailability(facultyId, date, time, facultyObj = null) {
   if (window.AvailabilityService && typeof window.AvailabilityService.resolveFacultyAvailability === 'function') {
-    return window.AvailabilityService.resolveFacultyAvailability(facultyId, date, time);
+    return window.AvailabilityService.resolveFacultyAvailability(facultyId, date, time, facultyObj);
   }
 
   const store = window.DataStore.getStore();
   
   // 1. Inactive faculty account check
-  const faculty = (store.faculty || []).find(f => f.id === facultyId);
+  const faculty = facultyObj || (store.faculty || []).find(f => f.id === facultyId);
   if (!faculty) {
     return {
       status: 'not_updated',

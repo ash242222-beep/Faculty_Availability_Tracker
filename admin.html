@@ -406,159 +406,271 @@
     </section>
 
     <!-- ========================================================== -->
-    <!-- SECTION 4: AVAILABILITY OVERVIEW & OVERRIDES ENGINE -->
+    <!-- SECTION 4: AVAILABILITY OVERVIEW (SIMPLE & INTUITIVE) -->
     <!-- ========================================================== -->
     <section id="section-availability" class="admin-section" style="display: none;">
-      <div class="card">
-        <div class="card-header">
+      <!-- Search & Date/Time Checker Card -->
+      <div class="card" style="border-top: 4px solid var(--primary);">
+        <div class="card-header" style="flex-wrap: wrap; gap: 0.75rem;">
           <div>
-            <h2>Faculty Status & Availability Management</h2>
+            <h2>Faculty Availability Overview</h2>
             <div class="card-subtitle" style="margin-top: 0.25rem;">
-              Real-time snapshot of live faculty availability, manual status posts, and schedule override management.
+              Quickly find faculty members and view their real-time availability, cabin location, and weekly schedules.
             </div>
           </div>
-          <button id="btn-refresh-availability-admin" class="btn btn-secondary btn-sm">Refresh Status</button>
+          <div style="display: flex; gap: 0.5rem; align-items: center;">
+            <button type="button" id="btn-admin-avail-now" class="btn btn-secondary btn-sm" title="Reset to current date & time">Now</button>
+            <button type="button" id="btn-refresh-availability-admin" class="btn btn-secondary btn-sm">Refresh Status</button>
+          </div>
         </div>
 
-        <!-- Faculty Live Status Overview -->
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
-          <h3 style="font-size: 1rem; font-weight: 600; margin: 0;">Live Faculty Status (Campus-Wide)</h3>
-          <input type="text" id="admin-avail-search" class="form-control" placeholder="Search faculty name or cabin..." style="width: 200px; font-size: 0.8125rem; padding: 0.25rem 0.5rem;">
-        </div>
-
-        <div class="table-responsive" style="margin-bottom: 2rem;">
-          <table>
-            <thead>
-              <tr>
-                <th>Faculty</th>
-                <th>Department</th>
-                <th>Cabin</th>
-                <th>Current Status</th>
-                <th>Source</th>
-                <th>Note / Details</th>
-                <th>Last Update</th>
-              </tr>
-            </thead>
-            <tbody id="admin-availability-body">
-              <!-- Populated dynamically -->
-            </tbody>
-          </table>
-        </div>
-
-        <!-- Admin Override Creation / Edit Form -->
-        <div class="card-header" style="border-top: 1px solid var(--border-color); padding-top: 1.5rem;">
-          <div>
-            <h3 id="admin-override-form-title" style="font-size: 1.05rem; font-weight: 600; margin: 0;">Post Campus Schedule Override</h3>
-            <div class="card-subtitle" style="margin-top: 0.25rem;">
-              Overrides take strict priority over regular timetables (e.g., official faculty deputation, emergency leave, or extra doubt sessions).
-            </div>
-          </div>
-          <span id="admin-ov-duration-badge" style="font-size: 0.75rem; background: var(--border-color); padding: 0.2rem 0.5rem; border-radius: var(--radius-sm); font-weight: 500;">Duration: 1 hr</span>
-        </div>
-
-        <form id="admin-override-form" style="background: var(--surface-muted); padding: 1.25rem; border-radius: var(--radius-sm); margin-bottom: 1.5rem; border: 1px solid var(--border-color);">
-          <input type="hidden" id="admin-ov-edit-id" value="">
-
-          <!-- Live validation / collision preview box -->
-          <div id="admin-ov-validation-alert" style="display: none; padding: 0.5rem 0.75rem; border-radius: var(--radius-sm); font-size: 0.8125rem; margin-bottom: 0.75rem;"></div>
-
-          <div class="form-row">
-            <div class="form-group" style="flex: 1.5;">
-              <label for="admin-ov-faculty">Faculty Member *</label>
-              <select id="admin-ov-faculty" class="form-control" required></select>
-            </div>
-
-            <div class="form-group">
-              <label for="admin-ov-date">Target Date *</label>
-              <input type="date" id="admin-ov-date" class="form-control" required>
-            </div>
-
-            <div class="form-group">
-              <label for="admin-ov-start">Start Time *</label>
-              <input type="time" id="admin-ov-start" class="form-control" required value="10:00">
-            </div>
-
-            <div class="form-group">
-              <label for="admin-ov-end">End Time *</label>
-              <input type="time" id="admin-ov-end" class="form-control" required value="11:00">
-            </div>
+        <!-- Controls Row: Search, Department, Date, Time, Check Button -->
+        <div class="form-row" style="align-items: flex-end;">
+          <div class="form-group" style="flex: 1.5; margin-bottom: 0;">
+            <label for="admin-avail-search">Search Faculty</label>
+            <input type="text" id="admin-avail-search" class="form-control" placeholder="Search name, cabin, designation, or course...">
           </div>
 
-          <div class="form-row">
-            <div class="form-group" style="flex: 1;">
-              <label for="admin-ov-status">Override Status *</label>
-              <select id="admin-ov-status" class="form-control">
-                <option value="available">Available</option>
-                <option value="present">Present in Cabin</option>
-                <option value="in_meeting">In Meeting / Conference</option>
-                <option value="unavailable">Unavailable / On Leave</option>
-                <option value="in_class">Special Extra Class</option>
-              </select>
-            </div>
-
-            <div class="form-group" style="flex: 2;">
-              <label for="admin-ov-note">Reason / Note for Students</label>
-              <input type="text" id="admin-ov-note" class="form-control" placeholder="e.g. Deputed to University Inspection; available online">
-            </div>
-          </div>
-
-          <div style="display: flex; gap: 0.75rem; justify-content: flex-end; align-items: center;">
-            <button type="button" id="btn-cancel-admin-ov" class="btn btn-secondary btn-sm" style="display: none;">Cancel Edit</button>
-            <button type="submit" id="btn-submit-admin-ov" class="btn btn-primary btn-sm">Post Override</button>
-          </div>
-        </form>
-
-        <!-- Overrides Filter & Table -->
-        <div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 0.75rem; margin-bottom: 1rem;">
-          <div style="display: flex; align-items: center; gap: 0.5rem;">
-            <h3 style="font-size: 1.05rem; margin: 0;">Active & Scheduled Overrides</h3>
-            <span id="admin-ov-count-badge" class="badge-status badge-available" style="font-size: 0.75rem;">Loading...</span>
-          </div>
-
-          <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem;">
-            <select id="admin-ov-filter-faculty" class="form-control" style="width: auto; font-size: 0.8125rem; padding: 0.25rem 0.5rem;">
-              <option value="all">All Faculty</option>
-            </select>
-
-            <select id="admin-ov-filter-status" class="form-control" style="width: auto; font-size: 0.8125rem; padding: 0.25rem 0.5rem;">
-              <option value="all">All Statuses</option>
-              <option value="available">Available</option>
-              <option value="present">Present</option>
-              <option value="in_meeting">In Meeting</option>
-              <option value="unavailable">Unavailable</option>
-            </select>
-
-            <select id="admin-ov-filter-timing" class="form-control" style="width: auto; font-size: 0.8125rem; padding: 0.25rem 0.5rem;">
-              <option value="all">All Time</option>
-              <option value="active_today" selected>Today & Upcoming</option>
-              <option value="today">Today Only</option>
-              <option value="past">Past Overrides</option>
+          <div class="form-group" style="flex: 1.2; margin-bottom: 0;">
+            <label for="admin-avail-dept">Department</label>
+            <select id="admin-avail-dept" class="form-control">
+              <option value="All Departments">All Departments</option>
             </select>
           </div>
-        </div>
 
+          <div class="form-group" style="flex: 1; margin-bottom: 0;">
+            <label for="admin-avail-date">Target Date</label>
+            <input type="date" id="admin-avail-date" class="form-control">
+          </div>
+
+          <div class="form-group" style="flex: 1; margin-bottom: 0;">
+            <label for="admin-avail-time">Target Time</label>
+            <input type="time" id="admin-avail-time" class="form-control">
+          </div>
+
+          <div class="form-group" style="margin-bottom: 0;">
+            <button type="button" id="btn-check-admin-avail" class="btn btn-primary" style="height: 38px; width: 100%;">
+              Check Availability
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Quick Summary Metric Bar & Active Status Banner -->
+      <div style="display: flex; flex-wrap: wrap; gap: 0.75rem; margin-bottom: 1.25rem; align-items: center; justify-content: space-between;">
+        <div style="display: flex; gap: 0.75rem; flex-wrap: wrap;">
+          <div style="background: var(--surface); padding: 0.4rem 0.8rem; border-radius: var(--radius-sm); border: 1px solid var(--border-color); font-size: 0.85rem;">
+            Total Faculty: <strong id="stat-total-faculty">0</strong>
+          </div>
+          <div style="background: var(--surface); padding: 0.4rem 0.8rem; border-radius: var(--radius-sm); border: 1px solid var(--border-color); font-size: 0.85rem;">
+            Available: <strong id="stat-avail-count" style="color: var(--success);">0</strong>
+          </div>
+          <div style="background: var(--surface); padding: 0.4rem 0.8rem; border-radius: var(--radius-sm); border: 1px solid var(--border-color); font-size: 0.85rem;">
+            In Class: <strong id="stat-class-count" style="color: var(--primary);">0</strong>
+          </div>
+          <div style="background: var(--surface); padding: 0.4rem 0.8rem; border-radius: var(--radius-sm); border: 1px solid var(--border-color); font-size: 0.85rem;">
+            In Meeting / Busy: <strong id="stat-busy-count" style="color: #b45309;">0</strong>
+          </div>
+        </div>
+        <span id="admin-avail-time-banner" style="font-size: 0.85rem; color: var(--text-muted);">Real-time status updated live</span>
+      </div>
+
+      <!-- Faculty Availability Cards Grid -->
+      <div id="admin-faculty-cards-grid" class="grid-2">
+        <!-- Dynamically populated via js/admin.js -->
+      </div>
+
+      <!-- Empty State -->
+      <div id="admin-avail-empty-state" class="card" style="display: none; text-align: center; padding: 3rem 1.5rem;">
+        <p style="font-size: 1.125rem; font-weight: 600; color: var(--text-main); margin-bottom: 0.5rem;">
+          No faculty members found
+        </p>
+        <p style="color: var(--text-muted); font-size: 0.9375rem;">
+          Try adjusting your search query or selecting a different department filter.
+        </p>
+      </div>
+
+      <!-- Collapsible Advanced Schedule Overrides (For Admin Management) -->
+      <div style="margin-top: 2rem;">
+        <details style="background: var(--surface); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 1rem 1.25rem;">
+          <summary style="cursor: pointer; font-weight: 600; font-size: 0.9375rem; color: var(--text-main); outline: none;">
+            ⚙️ Advanced: Schedule Overrides Management (Overrides Engine)
+          </summary>
+          
+          <div style="margin-top: 1.25rem; border-top: 1px solid var(--border-color); padding-top: 1.25rem;">
+            <div class="card-header" style="padding: 0 0 1rem 0;">
+              <div>
+                <h3 id="admin-override-form-title" style="font-size: 1.05rem; font-weight: 600; margin: 0;">Post Campus Schedule Override</h3>
+                <div class="card-subtitle" style="margin-top: 0.25rem;">
+                  Overrides take priority over regular timetables (e.g., official faculty deputation, emergency leave, or extra doubt sessions).
+                </div>
+              </div>
+              <span id="admin-ov-duration-badge" style="font-size: 0.75rem; background: var(--border-color); padding: 0.2rem 0.5rem; border-radius: var(--radius-sm); font-weight: 500;">Duration: 1 hr</span>
+            </div>
+
+            <form id="admin-override-form" style="background: var(--surface-muted); padding: 1.25rem; border-radius: var(--radius-sm); margin-bottom: 1.5rem; border: 1px solid var(--border-color);">
+              <input type="hidden" id="admin-ov-edit-id" value="">
+
+              <div id="admin-ov-validation-alert" style="display: none; padding: 0.5rem 0.75rem; border-radius: var(--radius-sm); font-size: 0.8125rem; margin-bottom: 0.75rem;"></div>
+
+              <div class="form-row">
+                <div class="form-group" style="flex: 1.5;">
+                  <label for="admin-ov-faculty">Faculty Member *</label>
+                  <select id="admin-ov-faculty" class="form-control" required></select>
+                </div>
+
+                <div class="form-group">
+                  <label for="admin-ov-date">Target Date *</label>
+                  <input type="date" id="admin-ov-date" class="form-control" required>
+                </div>
+
+                <div class="form-group">
+                  <label for="admin-ov-start">Start Time *</label>
+                  <input type="time" id="admin-ov-start" class="form-control" required value="10:00">
+                </div>
+
+                <div class="form-group">
+                  <label for="admin-ov-end">End Time *</label>
+                  <input type="time" id="admin-ov-end" class="form-control" required value="11:00">
+                </div>
+              </div>
+
+              <div class="form-row">
+                <div class="form-group" style="flex: 1;">
+                  <label for="admin-ov-status">Override Status *</label>
+                  <select id="admin-ov-status" class="form-control">
+                    <option value="available">Available</option>
+                    <option value="present">Present in Cabin</option>
+                    <option value="in_meeting">In Meeting / Conference</option>
+                    <option value="unavailable">Unavailable / On Leave</option>
+                    <option value="in_class">Special Extra Class</option>
+                  </select>
+                </div>
+
+                <div class="form-group" style="flex: 2;">
+                  <label for="admin-ov-note">Reason / Note for Students</label>
+                  <input type="text" id="admin-ov-note" class="form-control" placeholder="e.g. Deputed to University Inspection; available online">
+                </div>
+              </div>
+
+              <div style="display: flex; gap: 0.75rem; justify-content: flex-end; align-items: center;">
+                <button type="button" id="btn-cancel-admin-ov" class="btn btn-secondary btn-sm" style="display: none;">Cancel Edit</button>
+                <button type="submit" id="btn-submit-admin-ov" class="btn btn-primary btn-sm">Post Override</button>
+              </div>
+            </form>
+
+            <div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 0.75rem; margin-bottom: 1rem;">
+              <div style="display: flex; align-items: center; gap: 0.5rem;">
+                <h4 style="font-size: 0.95rem; margin: 0;">Active Overrides List</h4>
+                <span id="admin-ov-count-badge" class="badge-status badge-available" style="font-size: 0.75rem;">0</span>
+              </div>
+
+              <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem;">
+                <select id="admin-ov-filter-faculty" class="form-control" style="width: auto; font-size: 0.8125rem; padding: 0.25rem 0.5rem;">
+                  <option value="all">All Faculty</option>
+                </select>
+
+                <select id="admin-ov-filter-status" class="form-control" style="width: auto; font-size: 0.8125rem; padding: 0.25rem 0.5rem;">
+                  <option value="all">All Statuses</option>
+                  <option value="available">Available</option>
+                  <option value="present">Present</option>
+                  <option value="in_meeting">In Meeting</option>
+                  <option value="unavailable">Unavailable</option>
+                </select>
+
+                <select id="admin-ov-filter-timing" class="form-control" style="width: auto; font-size: 0.8125rem; padding: 0.25rem 0.5rem;">
+                  <option value="all">All Time</option>
+                  <option value="active_today" selected>Today & Upcoming</option>
+                  <option value="today">Today Only</option>
+                  <option value="past">Past Overrides</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="table-responsive">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Faculty</th>
+                    <th>Date</th>
+                    <th>Time Window</th>
+                    <th>Status</th>
+                    <th>Timeline</th>
+                    <th>Note</th>
+                    <th style="width: 140px;">Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="admin-overrides-body">
+                  <!-- Populated dynamically -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </details>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Admin Weekly Timetable Modal -->
+  <div id="admin-timetable-modal" class="modal-overlay" style="display: none;">
+    <div class="modal-content" style="max-width: 750px;">
+      <div class="modal-header">
+        <div>
+          <h3 style="font-size: 1.125rem; font-weight: 700;">Weekly Timetable Schedule</h3>
+          <div id="admin-modal-faculty-name" style="font-size: 0.875rem; color: var(--text-muted); margin-top: 0.25rem;"></div>
+        </div>
+        <button id="close-admin-timetable-modal" class="close-btn" aria-label="Close modal">✕</button>
+      </div>
+
+      <div class="modal-body">
         <div class="table-responsive">
           <table>
             <thead>
               <tr>
-                <th>Faculty</th>
-                <th>Date</th>
+                <th>Day</th>
                 <th>Time Window</th>
-                <th>Status</th>
-                <th>Timeline</th>
-                <th>Note</th>
-                <th style="width: 140px;">Actions</th>
+                <th>Class / Activity</th>
+                <th>Room / Venue</th>
               </tr>
             </thead>
-            <tbody id="admin-overrides-body">
+            <tbody id="admin-modal-timetable-body">
               <!-- Populated dynamically -->
             </tbody>
           </table>
         </div>
       </div>
-    </section>
 
-  </main>
+      <div class="modal-footer">
+        <button class="btn btn-secondary btn-sm" onclick="document.getElementById('admin-timetable-modal').style.display='none'">
+          Close Window
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Admin Availability Breakdown Modal -->
+  <div id="admin-availability-breakdown-modal" class="modal-overlay" style="display: none;">
+    <div class="modal-content" style="max-width: 520px;">
+      <div class="modal-header">
+        <div>
+          <h3 style="font-size: 1.125rem; font-weight: 700;">Availability Status Details</h3>
+          <div id="admin-breakdown-faculty-title" style="font-size: 0.875rem; color: var(--text-muted); margin-top: 0.25rem;"></div>
+        </div>
+        <button id="close-admin-breakdown-modal" class="close-btn" aria-label="Close modal">✕</button>
+      </div>
+
+      <div class="modal-body" id="admin-breakdown-modal-content">
+        <!-- Injected dynamically -->
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn btn-secondary btn-sm" onclick="document.getElementById('admin-availability-breakdown-modal').style.display='none'">
+          Close
+        </button>
+      </div>
+    </div>
+  </div>
 
   <!-- Site Footer -->
   <footer class="site-footer">
