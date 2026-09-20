@@ -48,7 +48,6 @@
       <button class="btn btn-secondary admin-tab-btn" data-target="section-timetable">2. Timetable Management</button>
       <button class="btn btn-secondary admin-tab-btn" data-target="section-import">3. Timetable Import (CSV/PDF)</button>
       <button class="btn btn-secondary admin-tab-btn" data-target="section-availability">4. Availability Overview</button>
-      <button class="btn btn-secondary admin-tab-btn" data-target="section-history">5. Import History</button>
     </div>
 
     <!-- ========================================================== -->
@@ -301,12 +300,42 @@
           </div>
         </div>
 
-        <!-- File Drop Area -->
-        <div id="timetable-file-drop" style="border: 2px dashed var(--border-color); border-radius: var(--radius-md); padding: 2.5rem 1.5rem; text-align: center; background: var(--surface-color); cursor: pointer; transition: all 0.2s ease; margin-bottom: 1.5rem;">
+        <!-- Step 1: Select Target Faculty Member -->
+        <div style="background: var(--surface-muted); padding: 1.25rem; border-radius: var(--radius-md); margin-bottom: 1.25rem; border: 1px solid var(--border-color);">
+          <div style="display: flex; flex-wrap: wrap; gap: 1.25rem; align-items: flex-start;">
+            <div style="flex: 1.2; min-width: 280px;">
+              <label for="import-target-faculty" style="display: block; font-weight: 600; font-size: 0.9375rem; margin-bottom: 0.35rem; color: var(--text-main);">
+                Step 1: Select Faculty Member *
+              </label>
+              <div style="font-size: 0.8125rem; color: var(--text-muted); margin-bottom: 0.6rem;">
+                Select the specific faculty member whose weekly timetable is being uploaded. All imported schedule slots will be assigned to this faculty member.
+              </div>
+              <select id="import-target-faculty" class="form-control" style="font-size: 0.9375rem; padding: 0.55rem 0.75rem;" required>
+                <option value="">-- Select Faculty Member * --</option>
+                <!-- Dynamically populated via js/timetable-import.js -->
+              </select>
+            </div>
+            
+            <div id="import-faculty-info-card" style="display: none; background: var(--surface-color); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 0.75rem 1rem; min-width: 260px; flex: 1;">
+              <div style="font-size: 0.75rem; text-transform: uppercase; font-weight: 700; color: var(--text-muted); margin-bottom: 0.25rem;">Target Faculty Details</div>
+              <div id="import-faculty-name-disp" style="font-weight: 600; font-size: 1rem; color: var(--primary);"></div>
+              <div id="import-faculty-dept-disp" style="font-size: 0.8125rem; color: var(--text-muted);"></div>
+              <div id="import-faculty-cabin-disp" style="font-size: 0.8125rem; color: var(--text-muted); margin-top: 0.25rem;"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Step 2: File Drop Area -->
+        <div style="margin-bottom: 0.5rem;">
+          <label style="display: block; font-weight: 600; font-size: 0.9375rem; margin-bottom: 0.35rem; color: var(--text-main);">
+            Step 2: Upload Timetable File (CSV or PDF) *
+          </label>
+        </div>
+        <div id="timetable-file-drop" style="border: 2px dashed var(--border-color); border-radius: var(--radius-md); padding: 2.25rem 1.5rem; text-align: center; background: var(--surface-color); cursor: pointer; transition: all 0.2s ease; margin-bottom: 1.5rem;">
           <div style="font-size: 2.5rem; margin-bottom: 0.5rem;">📁</div>
-          <h3 style="font-size: 1.1rem; margin-bottom: 0.25rem;">Click to browse or drag and drop timetable file</h3>
-          <p style="color: var(--text-muted); font-size: 0.875rem;">
-            Supports <strong>.CSV</strong> and <strong>text-based .PDF</strong> files (Standard tabular layout)
+          <h3 style="font-size: 1.05rem; margin-bottom: 0.25rem;">Click to browse or drag and drop timetable file</h3>
+          <p style="color: var(--text-muted); font-size: 0.875rem; margin: 0;">
+            Upload corresponding <strong>.CSV</strong> or <strong>text-based .PDF</strong> timetable for the selected faculty member
           </p>
           <input type="file" id="timetable-file-input" accept=".csv, .pdf" style="display: none;">
         </div>
@@ -529,72 +558,6 @@
       </div>
     </section>
 
-    <!-- ========================================================== -->
-    <!-- SECTION 5: IMPORT HISTORY -->
-    <!-- ========================================================== -->
-    <section id="section-history" class="admin-section" style="display: none;">
-      <div class="card">
-        <div class="card-header" style="flex-wrap: wrap; gap: 0.75rem;">
-          <div>
-            <h2>Timetable Import Audit History</h2>
-            <div class="card-subtitle" style="margin-top: 0.25rem;">
-              Permanent PostgreSQL audit log of all batch file uploads, row statistics, and completion statuses.
-            </div>
-          </div>
-          <div style="display: flex; gap: 0.5rem;">
-            <button id="btn-refresh-imports" class="btn btn-secondary btn-sm">Refresh Logs</button>
-            <button id="btn-clear-imports" class="btn btn-secondary btn-sm" style="color: var(--danger);">Clear Log History</button>
-          </div>
-        </div>
-
-        <!-- History Filters -->
-        <div style="background: var(--surface-muted); padding: 0.75rem; border-radius: var(--radius-sm); margin-bottom: 1rem; display: flex; gap: 0.75rem; flex-wrap: wrap; align-items: center;">
-          <div style="display: flex; align-items: center; gap: 0.4rem;">
-            <label for="import-filter-type" style="font-size: 0.8125rem; font-weight: 600; margin: 0;">Type:</label>
-            <select id="import-filter-type" class="form-control" style="font-size: 0.8125rem; padding: 0.25rem 0.5rem; width: auto;">
-              <option value="all">All Formats</option>
-              <option value="csv">CSV Only</option>
-              <option value="pdf">PDF Only</option>
-            </select>
-          </div>
-
-          <div style="display: flex; align-items: center; gap: 0.4rem;">
-            <label for="import-filter-status" style="font-size: 0.8125rem; font-weight: 600; margin: 0;">Status:</label>
-            <select id="import-filter-status" class="form-control" style="font-size: 0.8125rem; padding: 0.25rem 0.5rem; width: auto;">
-              <option value="all">All Statuses</option>
-              <option value="success">Success</option>
-              <option value="partial">Partial</option>
-              <option value="failed">Failed</option>
-            </select>
-          </div>
-
-          <div style="flex: 1; min-width: 200px;">
-            <input type="text" id="import-search-query" class="form-control" style="font-size: 0.8125rem; padding: 0.25rem 0.5rem;" placeholder="Search by file name or uploader...">
-          </div>
-        </div>
-
-        <div class="table-responsive">
-          <table>
-            <thead>
-              <tr>
-                <th>File Name</th>
-                <th>Type</th>
-                <th>Uploaded By</th>
-                <th>Rows Detected</th>
-                <th>Rows Imported</th>
-                <th>Status</th>
-                <th>Timestamp</th>
-                <th style="width: 80px; text-align: center;">Actions</th>
-              </tr>
-            </thead>
-            <tbody id="import-history-body">
-              <!-- Populated dynamically via js/admin.js -->
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </section>
-
   </main>
 
   <!-- Site Footer -->
@@ -617,7 +580,6 @@
   <script src="js/faculty-service.js"></script>
   <script src="js/timetable-service.js"></script>
   <script src="js/availability-service.js"></script>
-  <script src="js/import-service.js"></script>
   <script src="js/admin.js"></script>
   <script src="js/timetable-import.js"></script>
 </body>

@@ -232,28 +232,6 @@ const INITIAL_SAMPLE_DATA = {
       note: 'Lab lecture rescheduled; available in Cabin 12 for student questions',
       created_at: new Date().toISOString()
     }
-  ],
-  imports: [
-    {
-      id: 'imp-1',
-      file_name: 'Odd_Semester_2026_CS_IT.csv',
-      file_type: 'csv',
-      uploaded_by: 'Admin Office',
-      rows_detected: 42,
-      rows_imported: 42,
-      status: 'success',
-      created_at: '2026-09-15T10:00:00Z'
-    },
-    {
-      id: 'imp-2',
-      file_name: 'Mech_Eng_Timetable_Draft.pdf',
-      file_type: 'pdf',
-      uploaded_by: 'Admin Office',
-      rows_detected: 18,
-      rows_imported: 16,
-      status: 'partial',
-      created_at: '2026-09-18T14:30:00Z'
-    }
   ]
 };
 

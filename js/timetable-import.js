@@ -8,7 +8,7 @@
  * 3. 12-hour (AM/PM) and 24-hour time normalization
  * 4. Staged validation (self-overlap, room collision, database duplicate detection)
  * 5. Import mode selection (Append vs Replace Faculty Timetables)
- * 6. Audit logging into Supabase public.timetable_imports via ImportService
+ * 6. Target faculty member selection for scoped timetable imports
  */
 
 (function() {
@@ -30,6 +30,16 @@
     const sampleCsvDownloadBtn = document.getElementById('btn-download-sample-csv');
     const samplePdfDownloadBtn = document.getElementById('btn-download-sample-pdf');
 
+    // Step 1: Target Faculty Elements
+    const importTargetFaculty = document.getElementById('import-target-faculty');
+    const facultyInfoCard = document.getElementById('import-faculty-info-card');
+    const facultyNameDisp = document.getElementById('import-faculty-name-disp');
+    const facultyDeptDisp = document.getElementById('import-faculty-dept-disp');
+    const facultyCabinDisp = document.getElementById('import-faculty-cabin-disp');
+
+    let selectedFaculty = null;
+    let facultyCache = [];
+
     // Controls inside staged area
     const importModeSelect = document.getElementById('import-mode-select');
     const btnAutoFixStaged = document.getElementById('btn-autofix-staged');
@@ -37,6 +47,96 @@
     const filterAllBtn = document.getElementById('filter-staged-all');
     const filterValidBtn = document.getElementById('filter-staged-valid');
     const filterErrorsBtn = document.getElementById('filter-staged-errors');
+
+    /**
+     * Populate and manage Step 1 Faculty Selection
+     */
+    async function loadTargetFacultyOptions() {
+      if (!importTargetFaculty) return;
+      try {
+        facultyCache = await window.FacultyService.getAllFaculty();
+        const currentVal = importTargetFaculty.value;
+
+        importTargetFaculty.innerHTML = `
+          <option value="">-- Select Faculty Member * --</option>
+          ${(facultyCache || []).map(f => `
+            <option value="${f.id}" ${f.id === currentVal ? 'selected' : ''}>
+              ${f.full_name} (${f.department})
+            </option>
+          `).join('')}
+        `;
+
+        if (currentVal) {
+          const fac = facultyCache.find(f => f.id === currentVal);
+          if (fac) {
+            await setSelectedFaculty(fac);
+          }
+        }
+      } catch (err) {
+        console.warn('Error loading target faculty options in import module:', err);
+      }
+    }
+
+    async function setSelectedFaculty(fac) {
+      selectedFaculty = fac;
+      if (selectedFaculty && facultyInfoCard) {
+        facultyInfoCard.style.display = 'block';
+        if (facultyNameDisp) facultyNameDisp.textContent = selectedFaculty.full_name;
+        if (facultyDeptDisp) facultyDeptDisp.textContent = `${selectedFaculty.department} • ${selectedFaculty.designation || 'Faculty'}`;
+        
+        let slotCount = 0;
+        try {
+          const allTimetables = await window.TimetableService.getAllTimetables();
+          slotCount = (allTimetables || []).filter(t => t.faculty_id === selectedFaculty.id && t.is_active !== false).length;
+        } catch (e) {
+          // ignore
+        }
+
+        if (facultyCabinDisp) {
+          facultyCabinDisp.textContent = `Cabin: ${selectedFaculty.cabin || 'Not Assigned'} | ${slotCount} active timetable slot(s)`;
+        }
+
+        if (importModeSelect) {
+          importModeSelect.innerHTML = `
+            <option value="append" selected>Append (Keep existing schedules, add new slots for ${selectedFaculty.full_name})</option>
+            <option value="replace_faculty">Replace (Overwrite complete weekly timetable for ${selectedFaculty.full_name})</option>
+          `;
+        }
+      } else if (facultyInfoCard) {
+        facultyInfoCard.style.display = 'none';
+        if (importModeSelect) {
+          importModeSelect.innerHTML = `
+            <option value="append" selected>Append (Keep existing schedules)</option>
+            <option value="replace_faculty">Replace (Overwrite for uploaded faculty)</option>
+          `;
+        }
+      }
+    }
+
+    if (importTargetFaculty) {
+      importTargetFaculty.addEventListener('change', async () => {
+        const facId = importTargetFaculty.value;
+        const fac = facultyCache.find(f => f.id === facId);
+        await setSelectedFaculty(fac || null);
+
+        // If records are already staged, update them to this faculty
+        if (stagedImportRows.length > 0 && selectedFaculty) {
+          stagedImportRows.forEach(r => {
+            r.faculty_id = selectedFaculty.id;
+            r.faculty_name = selectedFaculty.full_name;
+          });
+          await revalidateStagedRows();
+        }
+      });
+    }
+
+    // Refresh faculty list when faculty data is updated elsewhere
+    window.addEventListener('faculty-data-changed', () => {
+      loadTargetFacultyOptions();
+    });
+
+    // Initial load of faculty options
+    loadTargetFacultyOptions();
 
     // Setup drag & drop
     if (fileDropArea && fileInput) {
@@ -69,23 +169,28 @@
       });
     }
 
-    // Sample CSV Downloads
+    // Sample CSV Downloads (Tailored to selected faculty member if chosen)
     if (sampleCsvDownloadBtn) {
       sampleCsvDownloadBtn.addEventListener('click', () => {
+        const targetFacName = selectedFaculty ? selectedFaculty.full_name : 'Dr. Rahul Sharma';
+        const targetDept = selectedFaculty ? selectedFaculty.department : 'Computer Engineering';
+        const targetCabin = selectedFaculty ? (selectedFaculty.cabin || 'LH-101') : 'Cabin 12';
+
         const sampleContent = 
-`Faculty Name,Department,Day,Start Time,End Time,Activity,Room
-Dr. Rahul Sharma,Computer Engineering,Monday,09:00,10:00,Operating Systems,LH-101
-Dr. Rahul Sharma,Computer Engineering,Monday,10:00,11:30,Data Structures Lab,Lab 2
-Dr. Priya Mehta,Information Technology,Monday,10:30,12:00,Database Systems,LH-201
-Prof. Arvind Patel,Electronics Engineering,Wednesday,14:00,16:00,Hardware Architecture,Circuit Lab 2
-Dr. Priya Mehta,Information Technology,Thursday,14:00,15:30,Academic Counseling,Cabin 8
-Dr. Sneha Rao,Mechanical Engineering,Friday,09:30,11:00,Thermodynamics Lecture,Auditorium B`;
+`Day,Start Time,End Time,Activity,Room
+Monday,09:00,10:00,Core Subject Lecture,LH-101
+Monday,10:30,12:00,Practical Laboratory Session,Lab 2
+Tuesday,09:30,11:00,Advanced Subject Lecture,LH-201
+Wednesday,11:00,12:30,Department Tutorial & Seminar,LH-102
+Thursday,14:00,15:30,Student Mentoring & Consultation,${targetCabin}
+Friday,10:00,11:30,Interactive Workshop,Auditorium B`;
 
         const blob = new Blob([sampleContent], { type: 'text/csv;charset=utf-8;' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = 'college_timetable_sample.csv';
+        const filePrefix = selectedFaculty ? selectedFaculty.full_name.toLowerCase().replace(/[^a-z0-9]/g, '_') : 'faculty';
+        a.download = `${filePrefix}_timetable_sample.csv`;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
@@ -105,17 +210,21 @@ Dr. Sneha Rao,Mechanical Engineering,Friday,09:30,11:00,Thermodynamics Lecture,A
           const { jsPDF } = window.jspdf;
           const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
 
+          const targetFacName = selectedFaculty ? selectedFaculty.full_name : 'Dr. Rahul Sharma';
+          const targetDept = selectedFaculty ? selectedFaculty.department : 'Computer Engineering';
+          const targetCabin = selectedFaculty ? (selectedFaculty.cabin || 'Cabin 12') : 'LH-101';
+
           // Header styling
           doc.setFillColor(30, 41, 59); // Slate dark
           doc.rect(0, 0, 297, 24, 'F');
           doc.setTextColor(255, 255, 255);
           doc.setFontSize(15);
           doc.setFont('helvetica', 'bold');
-          doc.text("MET's Institute of Engineering - Institutional Weekly Timetable", 14, 11);
+          doc.text("MET's Institute of Engineering - Faculty Weekly Timetable", 14, 11);
           doc.setFontSize(9);
           doc.setFont('helvetica', 'normal');
           doc.setTextColor(203, 213, 225);
-          doc.text("Academic Year 2025-2026 | Semester I | Validated Class & Laboratory Schedule", 14, 18);
+          doc.text(`Faculty Member: ${targetFacName} | Department: ${targetDept} | Semester Schedule`, 14, 18);
 
           // Table Header
           const startY = 36;
@@ -125,22 +234,19 @@ Dr. Sneha Rao,Mechanical Engineering,Friday,09:30,11:00,Thermodynamics Lecture,A
           doc.setFontSize(9);
           doc.setFont('helvetica', 'bold');
           
-          doc.text("Faculty Member", 16, startY);
-          doc.text("Day", 72, startY);
-          doc.text("Time Schedule", 102, startY);
-          doc.text("Activity / Course Name", 146, startY);
-          doc.text("Room / Venue", 230, startY);
+          doc.text("Day", 16, startY);
+          doc.text("Time Schedule", 58, startY);
+          doc.text("Activity / Course Name", 112, startY);
+          doc.text("Room / Venue", 220, startY);
 
-          // Table Data Rows
+          // Table Data Rows for selected faculty
           const sampleRows = [
-            ["Dr. Rahul Sharma", "Monday", "09:00 - 10:30", "Operating Systems Lecture", "LH-101"],
-            ["Dr. Rahul Sharma", "Monday", "11:00 - 12:30", "Advanced OS Laboratory", "Lab 2"],
-            ["Dr. Rahul Sharma", "Wednesday", "10:00 - 11:30", "System Architecture", "LH-102"],
-            ["Dr. Priya Mehta", "Tuesday", "09:30 - 11:00", "Database Systems Lecture", "LH-201"],
-            ["Dr. Priya Mehta", "Thursday", "14:00 - 15:30", "Academic Mentoring & Project Review", "Cabin 8"],
-            ["Prof. Arvind Patel", "Wednesday", "14:00 - 16:00", "Hardware Architecture Practical", "Circuit Lab 2"],
-            ["Prof. Arvind Patel", "Friday", "10:00 - 11:30", "Microprocessors & Embedded Systems", "LH-105"],
-            ["Dr. Sneha Rao", "Friday", "09:30 - 11:00", "Thermodynamics & Fluid Mechanics", "Auditorium B"]
+            ["Monday", "09:00 - 10:30", "Operating Systems & Architecture", "LH-101"],
+            ["Monday", "11:00 - 12:30", "Systems Programming Laboratory", "Lab 2"],
+            ["Tuesday", "09:30 - 11:00", "Data Structures & Algorithms", "LH-201"],
+            ["Wednesday", "10:00 - 11:30", "Department Seminar & Technical Colloquium", "LH-102"],
+            ["Thursday", "14:00 - 15:30", "Student Mentoring & Consultation", targetCabin],
+            ["Friday", "10:00 - 11:30", "Advanced Elective Lecture", "Auditorium B"]
           ];
 
           doc.setFont('helvetica', 'normal');
@@ -154,10 +260,9 @@ Dr. Sneha Rao,Mechanical Engineering,Friday,09:30,11:00,Thermodynamics Lecture,A
             }
             doc.setTextColor(30, 41, 59);
             doc.text(row[0], 16, currentY);
-            doc.text(row[1], 72, currentY);
-            doc.text(row[2], 102, currentY);
-            doc.text(row[3], 146, currentY);
-            doc.text(row[4], 230, currentY);
+            doc.text(row[1], 58, currentY);
+            doc.text(row[2], 112, currentY);
+            doc.text(row[3], 220, currentY);
 
             // Divider line
             doc.setDrawColor(226, 232, 240);
@@ -168,9 +273,10 @@ Dr. Sneha Rao,Mechanical Engineering,Friday,09:30,11:00,Thermodynamics Lecture,A
           // Footer
           doc.setFontSize(8);
           doc.setTextColor(100, 116, 139);
-          doc.text("Generated by Faculty Availability Tracker System - Compatible with in-browser PDF.js text parser", 14, 195);
+          doc.text(`Official timetable for ${targetFacName} - Compatible with in-browser PDF.js text parser`, 14, 195);
 
-          doc.save("sample_college_timetable.pdf");
+          const filePrefix = selectedFaculty ? selectedFaculty.full_name.toLowerCase().replace(/[^a-z0-9]/g, '_') : 'faculty';
+          doc.save(`${filePrefix}_timetable_sample.pdf`);
         } catch (err) {
           console.error("PDF generation failed:", err);
           alert("Error generating sample PDF: " + err.message);
@@ -179,6 +285,16 @@ Dr. Sneha Rao,Mechanical Engineering,Friday,09:30,11:00,Thermodynamics Lecture,A
     }
 
     function processFile(file) {
+      if (!selectedFaculty) {
+        alert('Please select a faculty member in Step 1 before uploading a timetable file.');
+        if (importTargetFaculty) {
+          importTargetFaculty.focus();
+          importTargetFaculty.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+        if (fileInput) fileInput.value = '';
+        return;
+      }
+
       stagedFileName = file.name;
       const extension = file.name.split('.').pop().toLowerCase();
 
@@ -270,32 +386,62 @@ Dr. Sneha Rao,Mechanical Engineering,Friday,09:30,11:00,Thermodynamics Lecture,A
           day: headerRow.findIndex(h => /day|weekday/.test(h)),
           start: headerRow.findIndex(h => /start|from|begin/.test(h)),
           end: headerRow.findIndex(h => /end|to|finish/.test(h)),
+          timeRange: headerRow.findIndex(h => /time|timing|slot|period|schedule/.test(h)),
           activity: headerRow.findIndex(h => /activity|subject|course|class|lecture/.test(h)),
           room: headerRow.findIndex(h => /room|venue|cabin|hall|lab|location/.test(h))
         };
 
         // Fallback default index positions if headers weren't found
-        if (colMap.faculty === -1) colMap.faculty = 0;
-        if (colMap.department === -1 && parsedGrid[0].length >= 7) colMap.department = 1;
-        if (colMap.day === -1) colMap.day = (colMap.department === 1) ? 2 : 1;
-        if (colMap.start === -1) colMap.start = colMap.day + 1;
-        if (colMap.end === -1) colMap.end = colMap.start + 1;
-        if (colMap.activity === -1) colMap.activity = colMap.end + 1;
-        if (colMap.room === -1) colMap.room = colMap.activity + 1;
+        if (colMap.day === -1) {
+          colMap.day = (colMap.faculty === 0) ? 1 : 0;
+        }
+        if (colMap.start === -1 && colMap.timeRange === -1) {
+          colMap.start = colMap.day + 1;
+        }
+        if (colMap.end === -1 && colMap.timeRange === -1) {
+          colMap.end = colMap.start + 1;
+        }
+        if (colMap.activity === -1) {
+          const afterTimes = (colMap.end >= 0) ? colMap.end + 1 : (colMap.timeRange >= 0 ? colMap.timeRange + 1 : colMap.day + 1);
+          colMap.activity = afterTimes;
+        }
+        if (colMap.room === -1) {
+          colMap.room = colMap.activity + 1;
+        }
 
         const rawRows = [];
         for (let r = 1; r < parsedGrid.length; r++) {
           const row = parsedGrid[r];
-          if (row.length < 3) continue;
+          if (row.length < 2 || row.every(cell => !cell)) continue;
+
+          let startTime = colMap.start >= 0 ? (row[colMap.start] || '') : '';
+          let endTime = colMap.end >= 0 ? (row[colMap.end] || '') : '';
+
+          // If start/end not found separately, check if single time range column was used
+          if ((!startTime || !endTime) && colMap.timeRange >= 0 && row[colMap.timeRange]) {
+            const rangeStr = row[colMap.timeRange];
+            const rangeMatch = rangeStr.match(/(\b\d{1,2}:\d{2}\s*(?:AM|PM)?)\s*(?:-|–|to)\s*(\b\d{1,2}:\d{2}\s*(?:AM|PM)?)/i);
+            if (rangeMatch) {
+              startTime = rangeMatch[1];
+              endTime = rangeMatch[2];
+            } else {
+              const times = rangeStr.match(/\b\d{1,2}:\d{2}\s*(?:AM|PM)?\b/gi);
+              if (times && times.length >= 2) {
+                startTime = times[0];
+                endTime = times[1];
+              }
+            }
+          }
 
           rawRows.push({
-            faculty_name: row[colMap.faculty] || '',
-            department: colMap.department >= 0 ? (row[colMap.department] || '') : '',
-            day_of_week: row[colMap.day] || '',
-            start_time: row[colMap.start] || '',
-            end_time: row[colMap.end] || '',
-            activity: row[colMap.activity] || '',
-            room: colMap.room >= 0 ? (row[colMap.room] || '') : ''
+            faculty_name: selectedFaculty ? selectedFaculty.full_name : (colMap.faculty >= 0 ? row[colMap.faculty] : ''),
+            faculty_id: selectedFaculty ? selectedFaculty.id : null,
+            department: selectedFaculty ? selectedFaculty.department : (colMap.department >= 0 ? row[colMap.department] : ''),
+            day_of_week: colMap.day >= 0 ? (row[colMap.day] || '') : '',
+            start_time: startTime,
+            end_time: endTime,
+            activity: colMap.activity >= 0 ? (row[colMap.activity] || '') : '',
+            room: colMap.room >= 0 ? (row[colMap.room] || '') : (selectedFaculty ? selectedFaculty.cabin : '')
           });
         }
 
@@ -484,13 +630,14 @@ Dr. Sneha Rao,Mechanical Engineering,Friday,09:30,11:00,Thermodynamics Lecture,A
             }
 
             rawRows.push({
-              faculty_name: rowFaculty,
-              department: '',
+              faculty_name: selectedFaculty ? selectedFaculty.full_name : rowFaculty,
+              faculty_id: selectedFaculty ? selectedFaculty.id : null,
+              department: selectedFaculty ? selectedFaculty.department : '',
               day_of_week: matchedDay,
               start_time: startTime,
               end_time: endTime,
               activity: cleanActivity,
-              room: room || 'LH-101'
+              room: room || (selectedFaculty ? selectedFaculty.cabin : 'LH-101')
             });
           }
         }
@@ -565,21 +712,25 @@ Dr. Sneha Rao,Mechanical Engineering,Friday,09:30,11:00,Thermodynamics Lecture,A
         }
 
         // 2. Faculty member matching
-        let matchedFacultyId = null;
-        let facultyDisplayName = (row.faculty_name || '').trim();
+        let matchedFacultyId = row.faculty_id || (selectedFaculty ? selectedFaculty.id : null);
+        let facultyDisplayName = row.faculty_name || (selectedFaculty ? selectedFaculty.full_name : '');
 
-        // Exact or fuzzy match
-        const matchedFacultyObj = facultyList.find(f => {
-          const fnA = f.full_name.toLowerCase();
-          const fnB = facultyDisplayName.toLowerCase();
-          return fnA === fnB || fnA.includes(fnB) || fnB.includes(fnA);
-        });
+        // If not directly set, attempt exact or fuzzy match against registered faculty
+        if (!matchedFacultyId && facultyDisplayName) {
+          const matchedFacultyObj = facultyList.find(f => {
+            const fnA = f.full_name.toLowerCase();
+            const fnB = facultyDisplayName.toLowerCase();
+            return fnA === fnB || fnA.includes(fnB) || fnB.includes(fnA);
+          });
 
-        if (matchedFacultyObj) {
-          matchedFacultyId = matchedFacultyObj.id;
-          facultyDisplayName = matchedFacultyObj.full_name;
-        } else {
-          errors.push(`Unknown faculty member: "${row.faculty_name}"`);
+          if (matchedFacultyObj) {
+            matchedFacultyId = matchedFacultyObj.id;
+            facultyDisplayName = matchedFacultyObj.full_name;
+          }
+        }
+
+        if (!matchedFacultyId) {
+          errors.push(`Faculty member must be specified or selected`);
         }
 
         // 3. Time validation
@@ -690,11 +841,12 @@ Dr. Sneha Rao,Mechanical Engineering,Friday,09:30,11:00,Thermodynamics Lecture,A
 
       // Status Alert
       if (importSummaryAlert) {
+        const facLabel = selectedFaculty ? `for <strong>${selectedFaculty.full_name}</strong> (${selectedFaculty.department})` : '';
         if (invalidCount === 0) {
           importSummaryAlert.className = 'alert alert-success';
           importSummaryAlert.innerHTML = `
             <div>
-              <strong>✓ Ready for Database Import:</strong> All <strong>${validCount}</strong> timetable row(s) passed validation.
+              <strong>✓ Ready for Database Import:</strong> All <strong>${validCount}</strong> timetable row(s) validated ${facLabel}.
               ${warningCount > 0 ? `<div style="font-size: 0.8125rem; margin-top: 0.25rem;">Note: ${warningCount} row(s) have advisories (e.g. existing duplicate in database).</div>` : ''}
             </div>
           `;
@@ -702,9 +854,9 @@ Dr. Sneha Rao,Mechanical Engineering,Friday,09:30,11:00,Thermodynamics Lecture,A
           importSummaryAlert.className = 'alert alert-warning';
           importSummaryAlert.innerHTML = `
             <div>
-              <strong>Action Required:</strong> <strong>${invalidCount}</strong> row(s) require fixes before they can be committed to the database.
+              <strong>Action Required:</strong> <strong>${invalidCount}</strong> row(s) require attention before they can be committed to the database.
               <span style="font-size: 0.8125rem; display: block; margin-top: 0.25rem;">
-                You can correct cells directly in the table below, select professors from the dropdown, or click "Auto-Fix Formats".
+                You can correct cells directly in the table below, select faculty from the dropdown, or click "Auto-Fix Formats".
               </span>
             </div>
           `;
@@ -872,8 +1024,9 @@ Dr. Sneha Rao,Mechanical Engineering,Friday,09:30,11:00,Thermodynamics Lecture,A
     // Re-run validation over staged rows
     async function revalidateStagedRows() {
       const raw = stagedImportRows.map(r => ({
-        faculty_name: r.faculty_name,
-        department: '',
+        faculty_name: r.faculty_name || (selectedFaculty ? selectedFaculty.full_name : ''),
+        faculty_id: r.faculty_id || (selectedFaculty ? selectedFaculty.id : null),
+        department: selectedFaculty ? selectedFaculty.department : '',
         day_of_week: r.day_of_week,
         start_time: r.start_time,
         end_time: r.end_time,
@@ -894,12 +1047,13 @@ Dr. Sneha Rao,Mechanical Engineering,Friday,09:30,11:00,Thermodynamics Lecture,A
           return;
         }
 
+        const facName = selectedFaculty ? selectedFaculty.full_name : 'Selected Faculty';
         const mode = importModeSelect ? importModeSelect.value : 'append';
         const modeDescription = mode === 'replace_faculty'
-          ? 'This will replace existing weekly timetables for the faculty members included in this file.'
-          : 'This will append new records to existing timetables.';
+          ? `This will replace existing weekly timetables for ${facName}.`
+          : `This will append new records to existing timetables for ${facName}.`;
 
-        if (!confirm(`Ready to import ${validRows.length} timetable records?\n\nImport Mode: ${mode.toUpperCase()}\n${modeDescription}`)) {
+        if (!confirm(`Ready to import ${validRows.length} timetable records for ${facName}?\n\nImport Mode: ${mode.toUpperCase()}\n${modeDescription}`)) {
           return;
         }
 
@@ -910,21 +1064,8 @@ Dr. Sneha Rao,Mechanical Engineering,Friday,09:30,11:00,Thermodynamics Lecture,A
           const importResult = await window.TimetableService.batchImportTimetables(validRows, { mode });
 
           const importedCount = importResult.imported;
-          const status = (importedCount === stagedImportRows.length) ? 'success' : (importedCount > 0 ? 'partial' : 'failed');
 
-          // Log into ImportService audit trail
-          if (window.ImportService) {
-            await window.ImportService.recordImportLog({
-              fileName: stagedFileName || 'timetable_upload.csv',
-              fileType: stagedFileType || 'csv',
-              uploadedBy: (window.Auth && window.Auth.getCurrentUser() ? window.Auth.getCurrentUser().name : 'Admin'),
-              rowsDetected: stagedImportRows.length,
-              rowsImported: importedCount,
-              status: status
-            });
-          }
-
-          alert(`Import Completed Successfully!\n\n• Rows Detected: ${stagedImportRows.length}\n• Rows Committed: ${importedCount}\n• Mode: ${mode}`);
+          alert(`Import Completed Successfully!\n\n• Faculty Member: ${facName}\n• Rows Detected: ${stagedImportRows.length}\n• Rows Committed: ${importedCount}\n• Mode: ${mode === 'replace_faculty' ? 'Replace Timetable' : 'Append to Timetable'}`);
 
           // Reset staging area
           stagedImportRows = [];
