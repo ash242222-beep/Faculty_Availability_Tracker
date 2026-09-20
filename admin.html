@@ -14,6 +14,8 @@
       window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
     }
   </script>
+  <!-- jsPDF for client-side sample PDF timetable generation -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 </head>
 <body>
 
@@ -293,7 +295,10 @@
               Upload institutional timetable schedules. Records are normalized, validated, and previewed with inline correction before any database insertion.
             </div>
           </div>
-          <button id="btn-download-sample-csv" class="btn btn-secondary btn-sm">Download Sample CSV</button>
+          <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+            <button id="btn-download-sample-csv" class="btn btn-secondary btn-sm">Download Sample CSV</button>
+            <button id="btn-download-sample-pdf" class="btn btn-secondary btn-sm">Download Sample PDF</button>
+          </div>
         </div>
 
         <!-- File Drop Area -->

@@ -7,6 +7,27 @@ and this project adheres to Semantic Versioning.
 
 ---
 
+## [v0.7.0] - 2026-09-20 - Milestone 7: Live Text-based PDF Timetable Import
+
+### Added
+- **Spatial PDF Coordinate Reconstruction Engine (`js/timetable-import.js`)**:
+  - Implemented multi-page text item grouping by vertical baseline ($Y$-coordinate within $\pm 4.5$ points) to prevent PDF.js token shuffling across multi-column tables.
+  - Horizontal ordering ($X$-coordinate ascending) with adaptive spacing detection based on text item bounding boxes and kerning.
+  - Handles table header discarding, professor section headings (`Faculty: Dr. Name` propagating to child class rows), pipe/tab-delimited records, and space-separated tabular schedules.
+- **Academic Entity Extractors**:
+  - **Day Parser**: Recognizes standard and abbreviated weekdays (`Mon`, `Tue`, `Wed`, `Thu`, `Fri`, `Sat`, `Sunday`).
+  - **Time Range Regex**: Parses hyphenated/dash/word ranges (`09:00 - 10:30`, `09:00 to 10:30`, `9:00 AM - 10:30 AM`, `14:00 16:00`).
+  - **Room & Venue Extractor**: Detects standard college venues including `LH-101`, `Lab 2`, `Circuit Lab 2`, `Cabin 8`, `Auditorium B`, `CR-3`.
+  - **Faculty Matcher**: Matches against registered faculty roster with academic honorific detection (`Dr.`, `Prof.`, `Mr.`, `Ms.`) and fallback to inline staging selector.
+- **Client-Side Sample PDF Timetable Generator (`admin.html` & `js/timetable-import.js`)**:
+  - Integrated `jsPDF` CDN to generate real text-based institutional timetable PDFs with 1 click (`Download Sample PDF`).
+  - Creates a styled landscape timetable containing 8 verified college class sessions for instant end-to-end import testing without external files.
+- **Unified Import & Audit Pipeline**:
+  - Seamlessly stages parsed PDF rows into the interactive pre-commit correction table with duration pills, validation alerts, inline cell editing, and `append`/`replace_faculty` commit modes.
+  - Automatically records PDF import runs into Supabase `public.timetable_imports` with row counts and status badges.
+
+---
+
 ## [v0.6.0] - 2026-09-20 - Milestone 6: Live CSV Timetable Import
 
 ### Added
