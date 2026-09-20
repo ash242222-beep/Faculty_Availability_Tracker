@@ -3,37 +3,70 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Sign In - Faculty Availability Tracker</title>
+  <title>Authentication - Faculty Availability Tracker</title>
   <link rel="stylesheet" href="css/style.css">
+  <!-- Supabase JS CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body style="background-color: var(--surface-muted); justify-content: center; align-items: center; padding: 1.5rem;">
 
-  <div style="width: 100%; max-width: 480px; margin: 0 auto;">
+  <div style="width: 100%; max-width: 520px; margin: 0 auto;">
     
     <!-- Brand Icon & Title -->
     <div style="text-align: center; margin-bottom: 1.5rem;">
       <a href="index.html" style="text-decoration: none; display: inline-flex; align-items: center; gap: 0.75rem;">
-        <div class="brand-icon" style="width: 42px; height: 42px; font-size: 1.25rem;">FA</div>
+        <div class="brand-icon" style="width: 44px; height: 44px; font-size: 1.3rem;">FA</div>
         <div style="text-align: left;">
           <h1 style="font-size: 1.25rem; font-weight: 700; color: var(--text-main);">Faculty Availability Tracker</h1>
-          <span style="font-size: 0.8125rem; color: var(--text-muted);">College Portal Authentication</span>
+          <span style="font-size: 0.8125rem; color: var(--text-muted);">College Portal Authentication & RBAC</span>
         </div>
       </a>
     </div>
 
-    <!-- Login Card -->
-    <div class="card" style="box-shadow: var(--shadow-md);">
-      <h2 style="font-size: 1.25rem; margin-bottom: 0.5rem; text-align: center;">Sign In to Your Account</h2>
-      <p style="color: var(--text-muted); font-size: 0.875rem; text-align: center; margin-bottom: 1.5rem;">
-        Select your role or enter your college credentials below
-      </p>
+    <!-- Main Auth Card -->
+    <div class="card" style="box-shadow: var(--shadow-md); padding: 1.75rem;">
 
-      <div id="login-alert" class="alert" style="display: none;"></div>
+      <!-- Mode Selector Tabs (Sign In vs Sign Up) -->
+      <div style="display: flex; gap: 0.5rem; border-bottom: 1px solid var(--border-color); padding-bottom: 0.75rem; margin-bottom: 1.25rem;">
+        <button type="button" id="tab-signin" class="btn btn-primary btn-sm" style="flex: 1;">Sign In</button>
+        <button type="button" id="tab-signup" class="btn btn-secondary btn-sm" style="flex: 1;">Create Account (Sign Up)</button>
+      </div>
 
-      <!-- Quick Demo Role Switcher Buttons -->
-      <div style="margin-bottom: 1.25rem; background: var(--surface-muted); padding: 0.75rem; border-radius: var(--radius-sm);">
+      <!-- Live Connection Status Badge -->
+      <div id="connection-status-container" style="display: flex; justify-content: space-between; align-items: center; background: var(--surface-muted); padding: 0.5rem 0.75rem; border-radius: var(--radius-sm); margin-bottom: 1rem; font-size: 0.8125rem;">
+        <div style="display: flex; align-items: center; gap: 0.5rem;">
+          <span id="connection-indicator-dot" style="width: 8px; height: 8px; border-radius: 50%; background-color: #10b981; display: inline-block;"></span>
+          <span id="connection-status-text" style="font-weight: 600; color: var(--text-main);">Checking connection...</span>
+        </div>
+        <button type="button" id="btn-toggle-config" style="background: none; border: none; color: var(--primary); cursor: pointer; text-decoration: underline; font-size: 0.75rem;">
+          Settings
+        </button>
+      </div>
+
+      <!-- Collapsible Supabase Keys Setting -->
+      <div id="supabase-config-panel" style="display: none; background: #f1f5f9; padding: 1rem; border-radius: var(--radius-sm); margin-bottom: 1.25rem; border: 1px solid var(--border-color);">
+        <h4 style="font-size: 0.875rem; margin-bottom: 0.5rem; color: var(--text-main);">Supabase Project Credentials</h4>
+        <p style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 0.75rem;">
+          Connect your live Supabase database and Auth. Leave empty to use local demo mode.
+        </p>
+        <div class="form-group" style="margin-bottom: 0.5rem;">
+          <label for="cfg-supabase-url" style="font-size: 0.75rem;">Project URL</label>
+          <input type="text" id="cfg-supabase-url" class="form-control" style="font-size: 0.8125rem; padding: 0.35rem 0.5rem;" placeholder="https://your-project.supabase.co">
+        </div>
+        <div class="form-group" style="margin-bottom: 0.75rem;">
+          <label for="cfg-supabase-key" style="font-size: 0.75rem;">Anon Public Key</label>
+          <input type="password" id="cfg-supabase-key" class="form-control" style="font-size: 0.8125rem; padding: 0.35rem 0.5rem;" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...">
+        </div>
+        <div style="display: flex; gap: 0.5rem; justify-content: flex-end;">
+          <button type="button" id="btn-clear-config" class="btn btn-secondary btn-sm" style="font-size: 0.75rem;">Reset to Demo Mode</button>
+          <button type="button" id="btn-save-config" class="btn btn-primary btn-sm" style="font-size: 0.75rem;">Save & Connect</button>
+        </div>
+      </div>
+
+      <!-- Quick Demo Role Switcher Buttons (for testing & viva) -->
+      <div id="demo-box" style="margin-bottom: 1.25rem; background: var(--surface-muted); padding: 0.75rem; border-radius: var(--radius-sm);">
         <div style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: var(--text-muted); margin-bottom: 0.5rem; text-align: center;">
-          Quick Demo Test Accounts (1-Click Fill)
+          Quick 1-Click Test Credentials
         </div>
         <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem;">
           <button type="button" class="btn btn-secondary btn-sm" id="btn-demo-student">Student</button>
@@ -42,29 +75,90 @@
         </div>
       </div>
 
-      <!-- Login Form -->
-      <form id="login-form">
+      <div id="auth-alert" class="alert" style="display: none; margin-bottom: 1rem;"></div>
+
+      <!-- ========================================== -->
+      <!-- 1. SIGN IN FORM -->
+      <!-- ========================================== -->
+      <form id="signin-form">
         <div class="form-group">
-          <label for="login-email">College Email Address</label>
-          <input type="email" id="login-email" class="form-control" placeholder="name@college.edu" required>
+          <label for="signin-email">College Email Address</label>
+          <input type="email" id="signin-email" class="form-control" placeholder="name@college.edu" required>
         </div>
 
         <div class="form-group">
-          <label for="login-password">Password</label>
-          <input type="password" id="login-password" class="form-control" placeholder="••••••••" required>
+          <label for="signin-password">Password</label>
+          <input type="password" id="signin-password" class="form-control" placeholder="••••••••" required>
         </div>
 
         <div class="form-group">
-          <label for="login-role">Assigned Role</label>
-          <select id="login-role" class="form-control">
-            <option value="student">Student (View Availability)</option>
-            <option value="faculty">Faculty (Update Status & Overrides)</option>
+          <label for="signin-role">Role</label>
+          <select id="signin-role" class="form-control">
+            <option value="student">Student (Check Faculty Availability)</option>
+            <option value="faculty">Faculty (Update Live Status & Overrides)</option>
             <option value="admin">Administrator (Manage Roster & Timetables)</option>
           </select>
         </div>
 
-        <button type="submit" id="btn-submit-login" class="btn btn-primary" style="width: 100%; margin-top: 0.5rem;">
+        <button type="submit" id="btn-submit-signin" class="btn btn-primary" style="width: 100%; margin-top: 0.5rem;">
           Sign In
+        </button>
+      </form>
+
+      <!-- ========================================== -->
+      <!-- 2. SIGN UP FORM -->
+      <!-- ========================================== -->
+      <form id="signup-form" style="display: none;">
+        <div class="form-group">
+          <label for="signup-name">Full Name</label>
+          <input type="text" id="signup-name" class="form-control" placeholder="Dr. Sarah Connor or Jane Doe" required>
+        </div>
+
+        <div class="form-group">
+          <label for="signup-email">College Email Address</label>
+          <input type="email" id="signup-email" class="form-control" placeholder="user@college.edu" required>
+        </div>
+
+        <div class="form-group">
+          <label for="signup-password">Create Password</label>
+          <input type="password" id="signup-password" class="form-control" placeholder="At least 6 characters" required minlength="6">
+        </div>
+
+        <div class="form-group">
+          <label for="signup-role">Account Role</label>
+          <select id="signup-role" class="form-control">
+            <option value="student">Student</option>
+            <option value="faculty">Faculty Member</option>
+          </select>
+        </div>
+
+        <!-- Faculty Extra Fields -->
+        <div id="signup-faculty-fields" style="display: none; background: var(--surface-muted); padding: 0.75rem; border-radius: var(--radius-sm); margin-bottom: 1rem;">
+          <div class="form-group" style="margin-bottom: 0.5rem;">
+            <label for="signup-dept">Department</label>
+            <select id="signup-dept" class="form-control">
+              <option value="Computer Engineering">Computer Engineering</option>
+              <option value="Information Technology">Information Technology</option>
+              <option value="Electronics Engineering">Electronics Engineering</option>
+              <option value="Mechanical Engineering">Mechanical Engineering</option>
+              <option value="Civil Engineering">Civil Engineering</option>
+            </select>
+          </div>
+
+          <div class="form-row" style="margin-bottom: 0;">
+            <div class="form-group" style="margin-bottom: 0;">
+              <label for="signup-designation">Designation</label>
+              <input type="text" id="signup-designation" class="form-control" placeholder="Assistant Professor">
+            </div>
+            <div class="form-group" style="margin-bottom: 0;">
+              <label for="signup-room">Cabin / Room</label>
+              <input type="text" id="signup-room" class="form-control" placeholder="Cabin 18">
+            </div>
+          </div>
+        </div>
+
+        <button type="submit" id="btn-submit-signup" class="btn btn-primary" style="width: 100%; margin-top: 0.5rem;">
+          Create Account
         </button>
       </form>
 
@@ -73,10 +167,9 @@
       </div>
     </div>
 
-    <!-- Help Box -->
-    <div style="text-align: center; font-size: 0.8125rem; color: var(--text-muted);">
-      In v0.1.0, credentials are authenticated using the local test directory.<br>
-      Supabase Auth with Row Level Security connects in v0.2.0.
+    <!-- Security & RBAC Notice -->
+    <div style="text-align: center; font-size: 0.8125rem; color: var(--text-muted); margin-top: 1rem;">
+      Role-Based Access Control (RBAC): Students view availability, Faculty manage schedules & overrides, Admins manage roster.
     </div>
 
   </div>
@@ -87,61 +180,223 @@
   <script src="js/auth.js"></script>
   <script>
     document.addEventListener('DOMContentLoaded', () => {
-      const emailInput = document.getElementById('login-email');
-      const passInput = document.getElementById('login-password');
-      const roleSelect = document.getElementById('login-role');
-      const loginForm = document.getElementById('login-form');
-      const loginAlert = document.getElementById('login-alert');
+      const tabSignIn = document.getElementById('tab-signin');
+      const tabSignUp = document.getElementById('tab-signup');
+      const formSignIn = document.getElementById('signin-form');
+      const formSignUp = document.getElementById('signup-form');
+      const demoBox = document.getElementById('demo-box');
+      const authAlert = document.getElementById('auth-alert');
 
-      // Demo buttons
+      const connectionIndicatorDot = document.getElementById('connection-indicator-dot');
+      const connectionStatusText = document.getElementById('connection-status-text');
+      const btnToggleConfig = document.getElementById('btn-toggle-config');
+      const configPanel = document.getElementById('supabase-config-panel');
+      const cfgUrlInput = document.getElementById('cfg-supabase-url');
+      const cfgKeyInput = document.getElementById('cfg-supabase-key');
+      const btnSaveConfig = document.getElementById('btn-save-config');
+      const btnClearConfig = document.getElementById('btn-clear-config');
+
+      const signupRoleSelect = document.getElementById('signup-role');
+      const signupFacultyFields = document.getElementById('signup-faculty-fields');
+
+      // Update connection status display
+      function updateConnectionStatus() {
+        const isConnected = window.SupabaseService && window.SupabaseService.isConfigured();
+        if (isConnected) {
+          connectionIndicatorDot.style.backgroundColor = '#10b981'; // Green
+          connectionStatusText.textContent = 'Live Supabase Auth Connected';
+        } else {
+          connectionIndicatorDot.style.backgroundColor = '#64748b'; // Slate neutral
+          connectionStatusText.textContent = 'Local College Demo Mode (Active)';
+        }
+
+        if (cfgUrlInput) cfgUrlInput.value = (window.APP_CONFIG && window.APP_CONFIG.SUPABASE_URL) || '';
+        if (cfgKeyInput) cfgKeyInput.value = (window.APP_CONFIG && window.APP_CONFIG.SUPABASE_ANON_KEY) || '';
+      }
+      updateConnectionStatus();
+
+      // Config panel toggle
+      btnToggleConfig.addEventListener('click', () => {
+        configPanel.style.display = configPanel.style.display === 'none' ? 'block' : 'none';
+      });
+
+      // Save custom credentials
+      btnSaveConfig.addEventListener('click', () => {
+        const url = cfgUrlInput.value.trim();
+        const key = cfgKeyInput.value.trim();
+        if (!url || !key) {
+          alert('Please enter both Supabase Project URL and Anon Public Key.');
+          return;
+        }
+        window.SupabaseService.setCredentials(url, key);
+        updateConnectionStatus();
+        configPanel.style.display = 'none';
+        authAlert.style.display = 'block';
+        authAlert.className = 'alert alert-success';
+        authAlert.textContent = 'Supabase credentials saved successfully!';
+      });
+
+      // Clear config to local mode
+      btnClearConfig.addEventListener('click', () => {
+        window.SupabaseService.setCredentials('', '');
+        updateConnectionStatus();
+        configPanel.style.display = 'none';
+        authAlert.style.display = 'block';
+        authAlert.className = 'alert alert-info';
+        authAlert.textContent = 'Reset to local college demo mode.';
+      });
+
+      // Switch between Sign In and Sign Up tabs
+      tabSignIn.addEventListener('click', () => {
+        tabSignIn.className = 'btn btn-primary btn-sm';
+        tabSignUp.className = 'btn btn-secondary btn-sm';
+        formSignIn.style.display = 'block';
+        formSignUp.style.display = 'none';
+        demoBox.style.display = 'block';
+        authAlert.style.display = 'none';
+      });
+
+      tabSignUp.addEventListener('click', () => {
+        tabSignUp.className = 'btn btn-primary btn-sm';
+        tabSignIn.className = 'btn btn-secondary btn-sm';
+        formSignUp.style.display = 'block';
+        formSignIn.style.display = 'none';
+        demoBox.style.display = 'none';
+        authAlert.style.display = 'none';
+      });
+
+      // Show faculty fields if faculty role chosen on sign up
+      signupRoleSelect.addEventListener('change', () => {
+        signupFacultyFields.style.display = signupRoleSelect.value === 'faculty' ? 'block' : 'none';
+      });
+
+      // 1-Click Demo Buttons
+      const signinEmail = document.getElementById('signin-email');
+      const signinPassword = document.getElementById('signin-password');
+      const signinRole = document.getElementById('signin-role');
+
       document.getElementById('btn-demo-student').addEventListener('click', () => {
-        emailInput.value = 'student@college.edu';
-        passInput.value = 'student123';
-        roleSelect.value = 'student';
+        signinEmail.value = 'student@college.edu';
+        signinPassword.value = 'student123';
+        signinRole.value = 'student';
       });
 
       document.getElementById('btn-demo-faculty').addEventListener('click', () => {
-        emailInput.value = 'rahul.sharma@college.edu';
-        passInput.value = 'faculty123';
-        roleSelect.value = 'faculty';
+        signinEmail.value = 'rahul.sharma@college.edu';
+        signinPassword.value = 'faculty123';
+        signinRole.value = 'faculty';
       });
 
       document.getElementById('btn-demo-admin').addEventListener('click', () => {
-        emailInput.value = 'admin@college.edu';
-        passInput.value = 'admin123';
-        roleSelect.value = 'admin';
+        signinEmail.value = 'admin@college.edu';
+        signinPassword.value = 'admin123';
+        signinRole.value = 'admin';
       });
 
-      // Default to student
+      // Default fill student demo
       document.getElementById('btn-demo-student').click();
 
-      loginForm.addEventListener('submit', (e) => {
+      // Check URL query for redirect
+      const urlParams = new URLSearchParams(window.location.search);
+      const redirectTarget = urlParams.get('redirect');
+
+      // Handle Sign In submission
+      formSignIn.addEventListener('submit', async (e) => {
         e.preventDefault();
-        const email = emailInput.value.trim();
-        const password = passInput.value.trim();
-        const role = roleSelect.value;
+        const submitBtn = document.getElementById('btn-submit-signin');
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Signing in...';
 
-        const result = Auth.loginUser(email, password, role);
-        if (result.success) {
-          loginAlert.style.display = 'block';
-          loginAlert.className = 'alert alert-success';
-          loginAlert.textContent = `Signed in as ${result.user.name} (${result.user.role.toUpperCase()}). Redirecting...`;
+        const email = signinEmail.value.trim();
+        const password = signinPassword.value.trim();
+        const role = signinRole.value;
 
-          setTimeout(() => {
-            if (result.user.role === 'admin') {
-              window.location.href = 'admin.html';
-            } else if (result.user.role === 'faculty') {
-              window.location.href = 'faculty.html';
-            } else {
-              window.location.href = 'student.html';
-            }
-          }, 400);
-        } else {
-          loginAlert.style.display = 'block';
-          loginAlert.className = 'alert alert-danger';
-          loginAlert.textContent = 'Invalid credentials. Please select one of the demo roles.';
+        try {
+          const result = await Auth.loginUser(email, password, role);
+          if (result.success) {
+            authAlert.style.display = 'block';
+            authAlert.className = 'alert alert-success';
+            authAlert.textContent = `Signed in as ${result.user.name} (${result.user.role.toUpperCase()}). Redirecting...`;
+
+            setTimeout(() => {
+              if (redirectTarget) {
+                window.location.href = redirectTarget;
+              } else if (result.user.role === 'admin') {
+                window.location.href = 'admin.html';
+              } else if (result.user.role === 'faculty') {
+                window.location.href = 'faculty.html';
+              } else {
+                window.location.href = 'student.html';
+              }
+            }, 350);
+          } else {
+            authAlert.style.display = 'block';
+            authAlert.className = 'alert alert-danger';
+            authAlert.textContent = result.error || 'Invalid credentials. Please check your email and password.';
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Sign In';
+          }
+        } catch (err) {
+          authAlert.style.display = 'block';
+          authAlert.className = 'alert alert-danger';
+          authAlert.textContent = err.message || 'Error occurred during login.';
+          submitBtn.disabled = false;
+          submitBtn.textContent = 'Sign In';
         }
       });
+
+      // Handle Sign Up submission
+      formSignUp.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const submitBtn = document.getElementById('btn-submit-signup');
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Creating Account...';
+
+        const name = document.getElementById('signup-name').value.trim();
+        const email = document.getElementById('signup-email').value.trim();
+        const password = document.getElementById('signup-password').value.trim();
+        const role = signupRoleSelect.value;
+        const dept = document.getElementById('signup-dept').value;
+        const designation = document.getElementById('signup-designation').value.trim();
+        const room = document.getElementById('signup-room').value.trim();
+
+        try {
+          const result = await Auth.signUpUser(email, password, {
+            fullName: name,
+            role: role,
+            department: dept,
+            designation: designation || (role === 'faculty' ? 'Assistant Professor' : ''),
+            room: room || (role === 'faculty' ? 'Cabin 10' : '')
+          });
+
+          if (result.success) {
+            authAlert.style.display = 'block';
+            authAlert.className = 'alert alert-success';
+            authAlert.textContent = result.message || 'Account created successfully! Redirecting...';
+
+            setTimeout(() => {
+              if (role === 'faculty') {
+                window.location.href = 'faculty.html';
+              } else {
+                window.location.href = 'student.html';
+              }
+            }, 500);
+          } else {
+            authAlert.style.display = 'block';
+            authAlert.className = 'alert alert-danger';
+            authAlert.textContent = result.error || 'Registration failed. Please try again.';
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Create Account';
+          }
+        } catch (err) {
+          authAlert.style.display = 'block';
+          authAlert.className = 'alert alert-danger';
+          authAlert.textContent = err.message || 'Error occurred during registration.';
+          submitBtn.disabled = false;
+          submitBtn.textContent = 'Create Account';
+        }
+      });
+
     });
   </script>
 </body>

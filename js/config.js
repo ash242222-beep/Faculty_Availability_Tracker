@@ -1,15 +1,16 @@
 /**
  * Faculty Availability Tracker - Configuration Module
- * Version: v0.1.0
+ * Version: v0.2.0 (Milestone 2 - Authentication)
  */
 
 const APP_CONFIG = {
-  VERSION: 'v0.1.0',
+  VERSION: 'v0.2.0',
   APP_NAME: 'Faculty Availability Tracker',
   
-  // Supabase Configuration (Will be filled when connecting Supabase in v0.2.0)
-  SUPABASE_URL: '',
-  SUPABASE_ANON_KEY: '',
+  // Supabase Configuration
+  // Checked first from localStorage so credentials can be set live in preview or deployed environments
+  SUPABASE_URL: (typeof localStorage !== 'undefined' && localStorage.getItem('fat_supabase_url')) || '',
+  SUPABASE_ANON_KEY: (typeof localStorage !== 'undefined' && localStorage.getItem('fat_supabase_anon_key')) || '',
   
   // Status definitions & human readable labels
   STATUSES: {

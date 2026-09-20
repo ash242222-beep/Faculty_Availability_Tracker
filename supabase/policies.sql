@@ -1,6 +1,6 @@
 -- ==========================================================
 -- Faculty Availability Tracker - Row Level Security (RLS) Policies
--- Version: v0.1.0
+-- Version: v0.2.0 (Milestone 2 - Authentication)
 -- ==========================================================
 
 -- Enable RLS on all tables
@@ -35,6 +35,13 @@ TO authenticated
 USING (auth.get_user_role() = 'admin')
 WITH CHECK (auth.get_user_role() = 'admin');
 
+-- Faculty can update their own profile details
+CREATE POLICY "Faculty update own profile"
+ON faculty FOR UPDATE
+TO authenticated
+USING (user_id = auth.uid() OR email = auth.jwt() ->> 'email')
+WITH CHECK (user_id = auth.uid() OR email = auth.jwt() ->> 'email');
+
 -- ----------------------------------------------------------
 -- 2. Timetables Table Policies
 -- ----------------------------------------------------------
@@ -66,12 +73,12 @@ ON availability FOR ALL
 TO authenticated
 USING (
   faculty_id IN (
-    SELECT id FROM faculty WHERE email = auth.jwt() ->> 'email'
+    SELECT id FROM faculty WHERE user_id = auth.uid() OR email = auth.jwt() ->> 'email'
   ) OR auth.get_user_role() = 'admin'
 )
 WITH CHECK (
   faculty_id IN (
-    SELECT id FROM faculty WHERE email = auth.jwt() ->> 'email'
+    SELECT id FROM faculty WHERE user_id = auth.uid() OR email = auth.jwt() ->> 'email'
   ) OR auth.get_user_role() = 'admin'
 );
 
@@ -90,12 +97,12 @@ ON availability_overrides FOR ALL
 TO authenticated
 USING (
   faculty_id IN (
-    SELECT id FROM faculty WHERE email = auth.jwt() ->> 'email'
+    SELECT id FROM faculty WHERE user_id = auth.uid() OR email = auth.jwt() ->> 'email'
   ) OR auth.get_user_role() = 'admin'
 )
 WITH CHECK (
   faculty_id IN (
-    SELECT id FROM faculty WHERE email = auth.jwt() ->> 'email'
+    SELECT id FROM faculty WHERE user_id = auth.uid() OR email = auth.jwt() ->> 'email'
   ) OR auth.get_user_role() = 'admin'
 );
 

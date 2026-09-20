@@ -163,9 +163,9 @@ The frontend uses standard static HTML5, CSS3, and JavaScript:
 ## 9. GitHub Workflow & Release Process
 
 Releases follow semantic milestone versions:
-- `v0.1.0` - Static UI (Current)
-- `v0.2.0` - Supabase Authentication
-- `v0.3.0` - Faculty Database & Search
+- `v0.1.0` - Static UI (Completed)
+- `v0.2.0` - Supabase Authentication (Current)
+- `v0.3.0` - Faculty Database & Search (Next)
 - `v0.4.0` - Timetable Engine & Validation
 - `v0.5.0` - Central Availability & Overrides
 - `v0.6.0` - CSV Timetable Import
@@ -177,6 +177,6 @@ Releases follow semantic milestone versions:
 
 ## 10. Current Version Status
 
-- **Active Version**: `v0.1.0`
-- **Milestone Name**: Static UI
+- **Active Version**: `v0.2.0`
+- **Milestone Name**: Authentication (Supabase Auth & RBAC)
 - **Status**: Complete and ready for user review.

@@ -7,6 +7,29 @@ and this project adheres to Semantic Versioning.
 
 ---
 
+## [v0.2.0] - 2026-09-20 - Milestone 2: Authentication
+
+### Added
+- **Supabase Authentication Engine (`js/auth.js`)**:
+  - Direct integration with Supabase Auth (`signUp`, `signInWithPassword`, `signOut`, `getSession`, `onAuthStateChange`).
+  - Automatic profile linking: maps authenticated `auth.users` accounts to `public.faculty` and initial `public.availability` status.
+  - Multi-tab session synchronization: listens to `onAuthStateChange` to keep active user credentials and header indicators updated.
+- **Enhanced Authentication Interface (`login.html`)**:
+  - Interactive dual-mode tabs: **Sign In** and **Create Account (Sign Up)**.
+  - Dynamic faculty registration fields: Department, Designation, and Cabin/Room.
+  - Live connection indicator dot displaying real-time Supabase Auth connectivity vs interactive college demo mode.
+  - Built-in Supabase Credentials settings panel to configure/switch Project URL and Anon Public Key directly in the browser.
+  - Preserved 1-click quick testing accounts for Student, Faculty, and Admin.
+- **Role-Based Access Control (RBAC) & Route Protection**:
+  - `requireRole(['student', 'faculty', 'admin'])` guard enforcing strict separation of permissions.
+  - Unauthenticated redirects retain `?redirect=` parameter to bring users directly to their intended dashboard after login.
+  - Unauthorized role navigation blocked with automated redirection.
+- **Database Schema & Row Level Security Enhancements**:
+  - Updated `supabase/schema.sql` with `user_id UUID REFERENCES auth.users(id)` and `handle_new_auth_user()` database trigger.
+  - Updated `supabase/policies.sql` with `auth.uid()` and `auth.jwt()` evaluation rules for faculty profile, availability, and overrides self-management.
+
+---
+
 ## [v0.1.0] - 2026-09-20 - Milestone 1: Static UI
 
 ### Added

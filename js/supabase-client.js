@@ -1,10 +1,74 @@
 /**
  * Faculty Availability Tracker - Supabase Client & Local Mock Store
- * Version: v0.1.0
+ * Version: v0.2.0 (Milestone 2 - Authentication)
  * 
- * Provides an active data layer for v0.1.0 static UI with safe initial sample data
- * stored in localStorage. Seamlessly connects to real Supabase client in v0.2.0+.
+ * Manages Supabase client initialization with seamless fallback to localStorage DataStore.
  */
+
+let _supabaseClientInstance = null;
+
+function initSupabaseClient() {
+  const url = (window.APP_CONFIG && window.APP_CONFIG.SUPABASE_URL) || '';
+  const key = (window.APP_CONFIG && window.APP_CONFIG.SUPABASE_ANON_KEY) || '';
+
+  if (url && key) {
+    if (window.supabase && typeof window.supabase.createClient === 'function') {
+      try {
+        _supabaseClientInstance = window.supabase.createClient(url, key, {
+          auth: {
+            persistSession: true,
+            autoRefreshToken: true,
+            detectSessionInUrl: true
+          }
+        });
+        console.info('Supabase client initialized successfully with URL:', url);
+        return _supabaseClientInstance;
+      } catch (err) {
+        console.warn('Failed to initialize Supabase client:', err);
+        _supabaseClientInstance = null;
+      }
+    }
+  }
+  return null;
+}
+
+function getSupabaseClient() {
+  if (!_supabaseClientInstance) {
+    initSupabaseClient();
+  }
+  return _supabaseClientInstance;
+}
+
+function isSupabaseConfigured() {
+  return !!getSupabaseClient();
+}
+
+function setSupabaseCredentials(url, key) {
+  if (url && key) {
+    localStorage.setItem('fat_supabase_url', url.trim());
+    localStorage.setItem('fat_supabase_anon_key', key.trim());
+    if (window.APP_CONFIG) {
+      window.APP_CONFIG.SUPABASE_URL = url.trim();
+      window.APP_CONFIG.SUPABASE_ANON_KEY = key.trim();
+    }
+    _supabaseClientInstance = null;
+    return initSupabaseClient();
+  } else {
+    localStorage.removeItem('fat_supabase_url');
+    localStorage.removeItem('fat_supabase_anon_key');
+    if (window.APP_CONFIG) {
+      window.APP_CONFIG.SUPABASE_URL = '';
+      window.APP_CONFIG.SUPABASE_ANON_KEY = '';
+    }
+    _supabaseClientInstance = null;
+    return null;
+  }
+}
+
+// Try auto-initialization at load time
+if (typeof window !== 'undefined') {
+  initSupabaseClient();
+}
 
 const INITIAL_SAMPLE_DATA = {
   faculty: [
@@ -223,4 +287,11 @@ window.DataStore = {
   getStore,
   saveStore,
   resetStoreToDefault
+};
+
+window.SupabaseService = {
+  getClient: getSupabaseClient,
+  isConfigured: isSupabaseConfigured,
+  setCredentials: setSupabaseCredentials,
+  init: initSupabaseClient
 };

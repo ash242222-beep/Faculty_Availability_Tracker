@@ -1,14 +1,14 @@
 /**
  * Faculty Availability Tracker - Authentication Module
- * Version: v0.1.0
+ * Version: v0.2.0 (Milestone 2 - Authentication)
  * 
- * Handles user authentication state, role-based page protection,
- * and quick-login helpers for demo / viva testing.
+ * Manages Supabase Auth, local session synchronization,
+ * role-based route protection, and 1-click demo test accounts.
  */
 
 const AUTH_STORAGE_KEY = 'fat_current_user_v1';
 
-// Preset demo accounts for quick role-testing in v0.1.0
+// Preset demo accounts for quick role-testing
 const DEMO_USERS = {
   student: {
     id: 'demo-student-id',
@@ -34,7 +34,7 @@ const DEMO_USERS = {
 };
 
 /**
- * Returns current authenticated user or null
+ * Returns currently stored authenticated user or null
  */
 function getCurrentUser() {
   const userJson = localStorage.getItem(AUTH_STORAGE_KEY);
@@ -48,47 +48,279 @@ function getCurrentUser() {
 }
 
 /**
- * Log in a user by role or email/password
+ * Persists user session in local storage
  */
-function loginUser(email, password, role) {
-  // If role is specified from demo shortcut
-  if (role && DEMO_USERS[role]) {
-    const user = DEMO_USERS[role];
+function setCurrentUser(user) {
+  if (user) {
     localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(user));
+  } else {
+    localStorage.removeItem(AUTH_STORAGE_KEY);
+  }
+}
+
+/**
+ * Register a new user account (Student or Faculty) via Supabase Auth or local store
+ */
+async function signUpUser(email, password, profileData = {}) {
+  const role = profileData.role || 'student';
+  const fullName = profileData.fullName || email.split('@')[0];
+  const department = profileData.department || 'Computer Engineering';
+  const designation = profileData.designation || (role === 'faculty' ? 'Assistant Professor' : '');
+  const room = profileData.room || (role === 'faculty' ? 'Cabin 10' : '');
+
+  const client = window.SupabaseService && window.SupabaseService.getClient();
+
+  if (client) {
+    try {
+      const { data, error } = await client.auth.signUp({
+        email: email.trim(),
+        password: password,
+        options: {
+          data: {
+            role: role,
+            full_name: fullName,
+            department: department,
+            designation: designation,
+            room: room
+          }
+        }
+      });
+
+      if (error) {
+        return { success: false, error: error.message };
+      }
+
+      const authUser = data.user;
+      let facultyId = null;
+
+      // If registered as faculty, insert into public.faculty table
+      if (role === 'faculty' && authUser) {
+        try {
+          const { data: facultyRows, error: facErr } = await client
+            .from('faculty')
+            .insert([
+              {
+                full_name: fullName,
+                email: email.trim(),
+                department: department,
+                designation: designation,
+                room: room,
+                is_active: true
+              }
+            ])
+            .select();
+
+          if (!facErr && facultyRows && facultyRows.length > 0) {
+            facultyId = facultyRows[0].id;
+            // Create default availability row
+            await client.from('availability').upsert({
+              faculty_id: facultyId,
+              status: 'available',
+              note: 'Account initialized'
+            });
+          }
+        } catch (dbErr) {
+          console.warn('Faculty table insert notice:', dbErr);
+        }
+      }
+
+      const userObject = {
+        id: authUser ? authUser.id : 'user-' + Date.now(),
+        email: email.trim(),
+        name: fullName,
+        role: role,
+        faculty_id: facultyId,
+        department: department,
+        room: room
+      };
+
+      setCurrentUser(userObject);
+      return { 
+        success: true, 
+        user: userObject, 
+        session: data.session,
+        message: data.session ? 'Account created and signed in!' : 'Account registered. Please verify your email if confirmation is enabled, or sign in.'
+      };
+    } catch (ex) {
+      return { success: false, error: ex.message || 'Registration failed.' };
+    }
+  }
+
+  // Fallback to local store
+  const store = window.DataStore ? window.DataStore.getStore() : null;
+  let localFacultyId = null;
+
+  if (role === 'faculty' && store) {
+    localFacultyId = 'f-' + Date.now();
+    const newFaculty = {
+      id: localFacultyId,
+      full_name: fullName,
+      email: email.trim(),
+      department: department,
+      designation: designation,
+      room: room,
+      is_active: true,
+      created_at: new Date().toISOString()
+    };
+    store.faculty = store.faculty || [];
+    store.faculty.push(newFaculty);
+
+    store.availability = store.availability || [];
+    store.availability.push({
+      faculty_id: localFacultyId,
+      status: 'available',
+      note: 'Account initialized',
+      updated_at: new Date().toISOString()
+    });
+
+    window.DataStore.saveStore(store);
+  }
+
+  const localUser = {
+    id: 'user-' + Date.now(),
+    email: email.trim(),
+    name: fullName,
+    role: role,
+    faculty_id: localFacultyId,
+    department: department,
+    room: room
+  };
+
+  setCurrentUser(localUser);
+  return { success: true, user: localUser, message: 'Account created successfully in local demo mode.' };
+}
+
+/**
+ * Sign in a user by role, credentials, or 1-click demo accounts
+ */
+async function loginUser(email, password, role, isDemoClick = false) {
+  // If explicitly a demo button click or matches quick demo presets
+  if (isDemoClick && role && DEMO_USERS[role]) {
+    const user = DEMO_USERS[role];
+    setCurrentUser(user);
     return { success: true, user };
   }
 
-  // Check against known demo emails
+  const client = window.SupabaseService && window.SupabaseService.getClient();
+
+  // If Supabase client is connected and real login was attempted
+  if (client && email && password && !isDemoClick) {
+    try {
+      const { data, error } = await client.auth.signInWithPassword({
+        email: email.trim(),
+        password: password
+      });
+
+      if (error) {
+        // If Supabase returns error, check if user is attempting demo credentials
+        for (const key of Object.keys(DEMO_USERS)) {
+          if (DEMO_USERS[key].email.toLowerCase() === email.trim().toLowerCase()) {
+            const user = DEMO_USERS[key];
+            setCurrentUser(user);
+            return { success: true, user };
+          }
+        }
+        return { success: false, error: error.message };
+      }
+
+      const authUser = data.user;
+      const metadata = authUser.user_metadata || {};
+      let detectedRole = metadata.role || role || 'student';
+      let facultyId = metadata.faculty_id || null;
+      let department = metadata.department || '';
+      let room = metadata.room || '';
+
+      // If user is faculty, fetch matching faculty record id
+      if (detectedRole === 'faculty') {
+        try {
+          const { data: facultyRows } = await client
+            .from('faculty')
+            .select('*')
+            .eq('email', email.trim())
+            .limit(1);
+
+          if (facultyRows && facultyRows.length > 0) {
+            facultyId = facultyRows[0].id;
+            department = facultyRows[0].department;
+            room = facultyRows[0].room;
+          }
+        } catch (fetchErr) {
+          console.warn('Faculty fetch warning:', fetchErr);
+        }
+      }
+
+      const user = {
+        id: authUser.id,
+        email: authUser.email,
+        name: metadata.full_name || email.split('@')[0],
+        role: detectedRole,
+        faculty_id: facultyId,
+        department: department,
+        room: room
+      };
+
+      setCurrentUser(user);
+      return { success: true, user, session: data.session };
+    } catch (err) {
+      console.warn('Supabase auth network error, trying local fallback:', err);
+    }
+  }
+
+  // Local / Demo credentials check
   for (const key of Object.keys(DEMO_USERS)) {
-    if (DEMO_USERS[key].email.toLowerCase() === email.toLowerCase()) {
+    if (DEMO_USERS[key].email.toLowerCase() === email.trim().toLowerCase()) {
       const user = DEMO_USERS[key];
-      localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(user));
+      setCurrentUser(user);
       return { success: true, user };
     }
   }
 
-  // Fallback: If email has 'admin', grant admin; if 'faculty', grant faculty; else student
-  let detectedRole = 'student';
+  // General fallback for testing any valid email
+  let detectedRole = role || 'student';
   if (email.includes('admin')) detectedRole = 'admin';
   else if (email.includes('faculty') || email.includes('prof') || email.includes('dr')) detectedRole = 'faculty';
 
+  // Check if faculty exists in local store
+  let facultyId = null;
+  let department = '';
+  let room = '';
+  if (detectedRole === 'faculty' && window.DataStore) {
+    const store = window.DataStore.getStore();
+    const fac = (store.faculty || []).find(f => f.email.toLowerCase() === email.trim().toLowerCase()) || store.faculty[0];
+    if (fac) {
+      facultyId = fac.id;
+      department = fac.department;
+      room = fac.room;
+    }
+  }
+
   const user = {
     id: 'user-' + Date.now(),
-    email: email,
-    name: email.split('@')[0].replace('.', ' ').toUpperCase(),
+    email: email.trim(),
+    name: email.split('@')[0].replace('.', ' ').replace(/^./, str => str.toUpperCase()),
     role: detectedRole,
-    faculty_id: detectedRole === 'faculty' ? 'f1-rahul-sharma' : null
+    faculty_id: facultyId,
+    department: department,
+    room: room
   };
 
-  localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(user));
+  setCurrentUser(user);
   return { success: true, user };
 }
 
 /**
  * Log out current user and redirect to login page
  */
-function logoutUser() {
-  localStorage.removeItem(AUTH_STORAGE_KEY);
+async function logoutUser() {
+  const client = window.SupabaseService && window.SupabaseService.getClient();
+  if (client) {
+    try {
+      await client.auth.signOut();
+    } catch (e) {
+      console.warn('Supabase sign out notice:', e);
+    }
+  }
+  setCurrentUser(null);
   window.location.href = 'login.html';
 }
 
@@ -123,7 +355,7 @@ function requireRole(allowedRoles = ['student', 'faculty', 'admin']) {
 }
 
 /**
- * Updates UI headers with user name & logout button if present
+ * Updates UI headers with user name & logout button
  */
 function initHeaderAuth() {
   const user = getCurrentUser();
@@ -132,7 +364,8 @@ function initHeaderAuth() {
 
   if (userDisplayEl) {
     if (user) {
-      userDisplayEl.innerHTML = `<span class="auth-user-tag">${user.name} (${user.role.toUpperCase()})</span>`;
+      const roleLabel = user.role.toUpperCase();
+      userDisplayEl.innerHTML = `<span class="auth-user-tag">${user.name} (${roleLabel})</span>`;
     } else {
       userDisplayEl.innerHTML = `<a href="login.html" class="btn btn-sm btn-secondary">Sign In</a>`;
     }
@@ -148,8 +381,51 @@ function initHeaderAuth() {
   }
 }
 
+/**
+ * Listen for Supabase auth state changes
+ */
+function initAuthListener() {
+  const client = window.SupabaseService && window.SupabaseService.getClient();
+  if (client) {
+    try {
+      client.auth.onAuthStateChange((event, session) => {
+        if (event === 'SIGNED_OUT') {
+          setCurrentUser(null);
+          initHeaderAuth();
+        } else if (event === 'SIGNED_IN' && session && session.user) {
+          const u = getCurrentUser();
+          if (!u || u.id !== session.user.id) {
+            const meta = session.user.user_metadata || {};
+            const restoredUser = {
+              id: session.user.id,
+              email: session.user.email,
+              name: meta.full_name || session.user.email.split('@')[0],
+              role: meta.role || 'student',
+              faculty_id: meta.faculty_id || null
+            };
+            setCurrentUser(restoredUser);
+            initHeaderAuth();
+          }
+        }
+      });
+    } catch (e) {
+      console.warn('Auth state change listener notice:', e);
+    }
+  }
+}
+
+// Auto-initialize header and listener on document ready
+if (typeof document !== 'undefined') {
+  document.addEventListener('DOMContentLoaded', () => {
+    initHeaderAuth();
+    initAuthListener();
+  });
+}
+
 window.Auth = {
   getCurrentUser,
+  setCurrentUser,
+  signUpUser,
   loginUser,
   logoutUser,
   getUserProfile,
@@ -157,3 +433,4 @@ window.Auth = {
   initHeaderAuth,
   DEMO_USERS
 };
+
