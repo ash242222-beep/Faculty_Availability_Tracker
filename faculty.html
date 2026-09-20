@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Faculty Dashboard - Faculty Availability Tracker</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <!-- Site Header -->
+  <header class="site-header">
+    <div class="container header-content">
+      <a href="index.html" class="site-brand">
+        <div class="brand-icon">FA</div>
+        <div class="brand-text">
+          <h1>Faculty Availability Tracker</h1>
+        </div>
+        <span class="brand-badge">Faculty Dashboard</span>
+      </a>
+
+      <nav class="site-nav">
+        <a href="student.html" class="nav-link">Student View</a>
+        <a href="faculty.html" class="nav-link active">Faculty Dashboard</a>
+        <a href="admin.html" class="nav-link">Admin View</a>
+        <span id="header-user-info"></span>
+        <button id="header-logout-btn" class="btn btn-sm btn-secondary" style="display: none;">Log Out</button>
+      </nav>
+    </div>
+  </header>
+
+  <main class="container" style="padding-top: 1.5rem; padding-bottom: 3rem;">
+    
+    <!-- Faculty Profile & Current Status Card -->
+    <div class="card" style="border-top: 4px solid var(--primary);">
+      <div class="card-header">
+        <div>
+          <h2 id="faculty-profile-name">Faculty Member</h2>
+          <div id="faculty-profile-dept" class="card-subtitle" style="margin-top: 0.25rem;">Department</div>
+        </div>
+        <div style="text-align: right; font-size: 0.875rem;">
+          <div><strong>Cabin / Office:</strong> <span id="faculty-profile-room">Cabin 12</span></div>
+          <div style="color: var(--text-muted);"><span id="faculty-profile-email">email@college.edu</span></div>
+        </div>
+      </div>
+
+      <!-- Live Status Update Controls -->
+      <div style="margin-top: 0.5rem;">
+        <label style="font-size: 0.9375rem; margin-bottom: 0.25rem;">
+          Update Your Current Availability Status
+        </label>
+        <div class="form-hint" style="margin-bottom: 0.75rem;">
+          Click a status button to set what students and staff see right now.
+        </div>
+
+        <div class="status-pill-grid">
+          <button type="button" class="status-pill-btn" data-status="available">
+            <span style="font-size: 1.1rem;">🟢</span>
+            <span>Available</span>
+          </button>
+          <button type="button" class="status-pill-btn" data-status="present">
+            <span style="font-size: 1.1rem;">🟣</span>
+            <span>Present</span>
+          </button>
+          <button type="button" class="status-pill-btn" data-status="in_meeting">
+            <span style="font-size: 1.1rem;">🟡</span>
+            <span>In Meeting</span>
+          </button>
+          <button type="button" class="status-pill-btn" data-status="unavailable">
+            <span style="font-size: 1.1rem;">🔴</span>
+            <span>Unavailable</span>
+          </button>
+        </div>
+
+        <div class="form-group" style="margin-top: 1rem;">
+          <label for="current-status-note">Optional Status Note for Students</label>
+          <input type="text" id="current-status-note" class="form-control" placeholder="e.g. In cabin for project doubt session until 3:00 PM">
+        </div>
+
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 0.5rem;">
+          <button id="btn-save-status" class="btn btn-primary">
+            Save Status
+          </button>
+          <div id="status-save-alert" style="display: none; margin: 0; padding: 0.4rem 0.75rem;"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Schedules Grid: Today's Schedule & Weekly Timetable -->
+    <div class="grid-2">
+      
+      <!-- Today's Schedule Card -->
+      <div class="card">
+        <div class="card-header">
+          <h3>Today's Classes & Activities</h3>
+          <span class="badge-status badge-in_class">Today</span>
+        </div>
+        <div class="table-responsive">
+          <table>
+            <thead>
+              <tr>
+                <th>Time</th>
+                <th>Class / Activity</th>
+                <th>Room</th>
+              </tr>
+            </thead>
+            <tbody id="today-schedule-body">
+              <!-- Populated dynamically via js/faculty.js -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Weekly Schedule Card -->
+      <div class="card">
+        <div class="card-header">
+          <h3>Weekly Timetable Overview</h3>
+          <span class="badge-status badge-not_updated">Regular</span>
+        </div>
+        <div class="table-responsive">
+          <table>
+            <thead>
+              <tr>
+                <th>Day</th>
+                <th>Time Window</th>
+                <th>Activity</th>
+                <th>Room</th>
+              </tr>
+            </thead>
+            <tbody id="weekly-schedule-body">
+              <!-- Populated dynamically -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Availability Overrides Management -->
+    <div class="card">
+      <div class="card-header">
+        <div>
+          <h3>Temporary Availability Overrides</h3>
+          <div class="card-subtitle" style="margin-top: 0.25rem;">
+            Overrides take strict priority over your regular timetable (e.g. if a class is cancelled or you are on leave).
+          </div>
+        </div>
+      </div>
+
+      <!-- Override Creation Form -->
+      <form id="override-form" style="background: var(--surface-muted); padding: 1.25rem; border-radius: var(--radius-sm); margin-bottom: 1.5rem;">
+        <input type="hidden" id="override-edit-id" value="">
+        
+        <div class="form-row">
+          <div class="form-group">
+            <label for="override-date">Date</label>
+            <input type="date" id="override-date" class="form-control" required>
+          </div>
+          <div class="form-group">
+            <label for="override-start-time">Start Time</label>
+            <input type="time" id="override-start-time" class="form-control" required value="10:00">
+          </div>
+          <div class="form-group">
+            <label for="override-end-time">End Time</label>
+            <input type="time" id="override-end-time" class="form-control" required value="11:00">
+          </div>
+          <div class="form-group">
+            <label for="override-status">Override Status</label>
+            <select id="override-status" class="form-control">
+              <option value="available">Available</option>
+              <option value="present">Present</option>
+              <option value="in_meeting">In Meeting</option>
+              <option value="unavailable">Unavailable</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="override-note">Optional Note / Reason</label>
+          <input type="text" id="override-note" class="form-control" placeholder="e.g. Lecture cancelled; available in cabin for questions">
+        </div>
+
+        <div style="display: flex; gap: 0.75rem; justify-content: flex-end;">
+          <button type="button" id="btn-cancel-override-edit" class="btn btn-secondary" style="display: none;">Cancel</button>
+          <button type="submit" id="btn-submit-override" class="btn btn-primary">Add Override</button>
+        </div>
+      </form>
+
+      <!-- Active Overrides Table -->
+      <div class="table-responsive">
+        <table>
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Time Window</th>
+              <th>Status</th>
+              <th>Note</th>
+              <th style="width: 130px;">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="overrides-table-body">
+            <!-- Populated dynamically via js/faculty.js -->
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- Site Footer -->
+  <footer class="site-footer">
+    <div class="container footer-content">
+      <div>
+        <strong>Faculty Availability Tracker</strong> — Faculty Dashboard
+      </div>
+      <div>
+        Faculty cannot modify another member's information
+      </div>
+    </div>
+  </footer>
+
+  <script src="js/config.js"></script>
+  <script src="js/supabase-client.js"></script>
+  <script src="js/utils.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/faculty.js"></script>
+</body>
+</html>

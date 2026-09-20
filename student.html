@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Student Portal - Faculty Availability Tracker</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <!-- Site Header -->
+  <header class="site-header">
+    <div class="container header-content">
+      <a href="index.html" class="site-brand">
+        <div class="brand-icon">FA</div>
+        <div class="brand-text">
+          <h1>Faculty Availability Tracker</h1>
+        </div>
+        <span class="brand-badge">Student Portal</span>
+      </a>
+
+      <nav class="site-nav">
+        <a href="student.html" class="nav-link active">Student View</a>
+        <a href="faculty.html" class="nav-link">Faculty View</a>
+        <a href="admin.html" class="nav-link">Admin View</a>
+        <span id="header-user-info"></span>
+        <button id="header-logout-btn" class="btn btn-sm btn-secondary" style="display: none;">Log Out</button>
+      </nav>
+    </div>
+  </header>
+
+  <main class="container" style="padding-top: 1.5rem; padding-bottom: 3rem;">
+    
+    <!-- Primary Workflow Card: Search & Date/Time Checker -->
+    <div class="card" style="border-top: 4px solid var(--primary);">
+      <div class="card-header">
+        <div>
+          <h2>Check Faculty Availability</h2>
+          <div class="card-subtitle" style="margin-top: 0.25rem;">
+            Quickly find faculty members and determine their availability for any specific date and time slot.
+          </div>
+        </div>
+      </div>
+
+      <!-- Controls Row: Search, Department, Date, Time, Check Button -->
+      <div class="form-row" style="align-items: flex-end;">
+        <div class="form-group" style="flex: 1.5; margin-bottom: 0;">
+          <label for="search-input">Search Faculty</label>
+          <input type="text" id="search-input" class="form-control" placeholder="Type name, cabin, or course...">
+        </div>
+
+        <div class="form-group" style="flex: 1.2; margin-bottom: 0;">
+          <label for="department-filter">Department</label>
+          <select id="department-filter" class="form-control">
+            <option value="All Departments">All Departments</option>
+          </select>
+        </div>
+
+        <div class="form-group" style="flex: 1; margin-bottom: 0;">
+          <label for="check-date">Target Date</label>
+          <input type="date" id="check-date" class="form-control">
+        </div>
+
+        <div class="form-group" style="flex: 1; margin-bottom: 0;">
+          <label for="check-time">Target Time</label>
+          <input type="time" id="check-time" class="form-control">
+        </div>
+
+        <div class="form-group" style="margin-bottom: 0;">
+          <button id="btn-check-availability" class="btn btn-primary" style="height: 38px; width: 100%;">
+            Check Availability
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Active query status banner -->
+    <div id="check-result-banner" style="display: none;"></div>
+
+    <!-- Faculty Directory / Availability Results -->
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+      <h3 style="font-size: 1.125rem; font-weight: 700;">Faculty Directory</h3>
+      <span style="font-size: 0.875rem; color: var(--text-muted);">Real-time status updated live</span>
+    </div>
+
+    <!-- Faculty Cards Grid -->
+    <div id="faculty-cards-grid" class="grid-2">
+      <!-- Populated dynamically via js/student.js -->
+    </div>
+
+    <!-- Empty State -->
+    <div id="empty-state" class="card" style="display: none; text-align: center; padding: 3rem 1.5rem;">
+      <p style="font-size: 1.125rem; font-weight: 600; color: var(--text-main); margin-bottom: 0.5rem;">
+        No faculty members found
+      </p>
+      <p style="color: var(--text-muted); font-size: 0.9375rem;">
+        Try adjusting your search query or selecting a different department filter.
+      </p>
+    </div>
+
+  </main>
+
+  <!-- Weekly Timetable Modal -->
+  <div id="timetable-modal" class="modal-overlay" style="display: none;">
+    <div class="modal-content">
+      <div class="modal-header">
+        <div>
+          <h3 style="font-size: 1.125rem; font-weight: 700;">Weekly Timetable Schedule</h3>
+          <div id="modal-faculty-name" style="font-size: 0.875rem; color: var(--text-muted); margin-top: 0.25rem;"></div>
+        </div>
+        <button id="close-timetable-modal" class="close-btn" aria-label="Close modal">✕</button>
+      </div>
+
+      <div class="modal-body">
+        <div class="table-responsive">
+          <table>
+            <thead>
+              <tr>
+                <th>Day</th>
+                <th>Time Window</th>
+                <th>Class / Activity</th>
+                <th>Room / Venue</th>
+              </tr>
+            </thead>
+            <tbody id="modal-timetable-body">
+              <!-- Populated dynamically -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn btn-secondary btn-sm" onclick="document.getElementById('timetable-modal').style.display='none'">
+          Close Window
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Site Footer -->
+  <footer class="site-footer">
+    <div class="container footer-content">
+      <div>
+        <strong>Faculty Availability Tracker</strong> — Student Portal
+      </div>
+      <div>
+        Clean, accessible & verified with central resolution logic
+      </div>
+    </div>
+  </footer>
+
+  <script src="js/config.js"></script>
+  <script src="js/supabase-client.js"></script>
+  <script src="js/utils.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/student.js"></script>
+</body>
+</html>

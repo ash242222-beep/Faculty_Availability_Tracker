@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Portal - Faculty Availability Tracker</title>
+  <link rel="stylesheet" href="css/style.css">
+  <!-- Lightweight PDF.js for text PDF extraction in browser -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script>
+    if (window.pdfjsLib) {
+      window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    }
+  </script>
+</head>
+<body>
+
+  <!-- Site Header -->
+  <header class="site-header">
+    <div class="container header-content">
+      <a href="index.html" class="site-brand">
+        <div class="brand-icon">FA</div>
+        <div class="brand-text">
+          <h1>Faculty Availability Tracker</h1>
+        </div>
+        <span class="brand-badge">Administration</span>
+      </a>
+
+      <nav class="site-nav">
+        <a href="student.html" class="nav-link">Student View</a>
+        <a href="faculty.html" class="nav-link">Faculty View</a>
+        <a href="admin.html" class="nav-link active">Admin Portal</a>
+        <span id="header-user-info"></span>
+        <button id="header-logout-btn" class="btn btn-sm btn-secondary" style="display: none;">Log Out</button>
+      </nav>
+    </div>
+  </header>
+
+  <main class="container" style="padding-top: 1.5rem; padding-bottom: 3rem;">
+    
+    <!-- Admin Navigation Tabs -->
+    <div style="display: flex; gap: 0.5rem; margin-bottom: 1.5rem; flex-wrap: wrap; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem;">
+      <button class="btn btn-secondary admin-tab-btn active" data-target="section-faculty">1. Faculty Management</button>
+      <button class="btn btn-secondary admin-tab-btn" data-target="section-timetable">2. Timetable Management</button>
+      <button class="btn btn-secondary admin-tab-btn" data-target="section-import">3. Timetable Import (CSV/PDF)</button>
+      <button class="btn btn-secondary admin-tab-btn" data-target="section-availability">4. Availability Overview</button>
+      <button class="btn btn-secondary admin-tab-btn" data-target="section-history">5. Import History</button>
+    </div>
+
+    <!-- ========================================================== -->
+    <!-- SECTION 1: FACULTY MANAGEMENT -->
+    <!-- ========================================================== -->
+    <section id="section-faculty" class="admin-section">
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <h2>Faculty Roster Management</h2>
+            <div class="card-subtitle" style="margin-top: 0.25rem;">
+              Manage professors, lecturers, and cabin assignments. Accounts can be paused (inactive) without deleting history.
+            </div>
+          </div>
+          <button id="btn-open-add-faculty" class="btn btn-primary btn-sm">+ Add New Faculty</button>
+        </div>
+
+        <div class="table-responsive">
+          <table>
+            <thead>
+              <tr>
+                <th>Full Name</th>
+                <th>Department</th>
+                <th>Designation</th>
+                <th>Cabin / Room</th>
+                <th>Status</th>
+                <th style="width: 170px;">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="faculty-table-body">
+              <!-- Populated via js/admin.js -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- Faculty Add/Edit Modal -->
+    <div id="faculty-modal" class="modal-overlay" style="display: none;">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3 id="faculty-modal-title">Add New Faculty Member</h3>
+          <button id="btn-close-faculty-modal" class="close-btn">✕</button>
+        </div>
+        <form id="faculty-form">
+          <div class="modal-body">
+            <input type="hidden" id="faculty-edit-id" value="">
+            
+            <div class="form-group">
+              <label for="faculty-name">Full Name</label>
+              <input type="text" id="faculty-name" class="form-control" placeholder="Dr. Rahul Sharma" required>
+            </div>
+
+            <div class="form-group">
+              <label for="faculty-email">College Email</label>
+              <input type="email" id="faculty-email" class="form-control" placeholder="rahul.sharma@college.edu" required>
+            </div>
+
+            <div class="form-row">
+              <div class="form-group">
+                <label for="faculty-dept">Department</label>
+                <select id="faculty-dept" class="form-control">
+                  <option value="Computer Engineering">Computer Engineering</option>
+                  <option value="Information Technology">Information Technology</option>
+                  <option value="Electronics Engineering">Electronics Engineering</option>
+                  <option value="Mechanical Engineering">Mechanical Engineering</option>
+                  <option value="Civil Engineering">Civil Engineering</option>
+                </select>
+              </div>
+
+              <div class="form-group">
+                <label for="faculty-designation">Designation</label>
+                <input type="text" id="faculty-designation" class="form-control" placeholder="Professor" required>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label for="faculty-room">Cabin / Room Number</label>
+              <input type="text" id="faculty-room" class="form-control" placeholder="Cabin 12" required>
+            </div>
+          </div>
+
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('faculty-modal').style.display='none'">Cancel</button>
+            <button type="submit" class="btn btn-primary btn-sm">Save Faculty Record</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- ========================================================== -->
+    <!-- SECTION 2: TIMETABLE MANAGEMENT -->
+    <!-- ========================================================== -->
+    <section id="section-timetable" class="admin-section" style="display: none;">
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <h2>Timetable Record Management</h2>
+            <div class="card-subtitle" style="margin-top: 0.25rem;">
+              Add and edit weekly lecture slots with automatic overlap and time boundary validation.
+            </div>
+          </div>
+        </div>
+
+        <!-- Add / Edit Timetable Form -->
+        <form id="timetable-form" style="background: var(--surface-muted); padding: 1.25rem; border-radius: var(--radius-sm); margin-bottom: 1.5rem;">
+          <input type="hidden" id="tt-edit-id" value="">
+          
+          <div class="form-row">
+            <div class="form-group" style="flex: 1.5;">
+              <label for="tt-faculty-select">Faculty Member</label>
+              <select id="tt-faculty-select" class="form-control" required></select>
+            </div>
+
+            <div class="form-group">
+              <label for="tt-day">Day of Week</label>
+              <select id="tt-day" class="form-control">
+                <option value="Monday">Monday</option>
+                <option value="Tuesday">Tuesday</option>
+                <option value="Wednesday">Wednesday</option>
+                <option value="Thursday">Thursday</option>
+                <option value="Friday">Friday</option>
+                <option value="Saturday">Saturday</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label for="tt-start-time">Start Time</label>
+              <input type="time" id="tt-start-time" class="form-control" required value="09:00">
+            </div>
+
+            <div class="form-group">
+              <label for="tt-end-time">End Time</label>
+              <input type="time" id="tt-end-time" class="form-control" required value="10:00">
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group" style="flex: 2;">
+              <label for="tt-activity">Class / Activity Name</label>
+              <input type="text" id="tt-activity" class="form-control" placeholder="e.g. CS402 - Data Structures Lab" required>
+            </div>
+
+            <div class="form-group" style="flex: 1;">
+              <label for="tt-room">Classroom / Lab Venue</label>
+              <input type="text" id="tt-room" class="form-control" placeholder="e.g. Lab 2">
+            </div>
+          </div>
+
+          <div style="display: flex; gap: 0.75rem; justify-content: flex-end;">
+            <button type="button" id="btn-cancel-tt-edit" class="btn btn-secondary" style="display: none;">Cancel</button>
+            <button type="submit" id="btn-submit-timetable" class="btn btn-primary">Add Timetable Record</button>
+          </div>
+        </form>
+
+        <!-- Filter bar -->
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+          <h3 style="font-size: 1.05rem;">Scheduled Classes</h3>
+          <div style="display: flex; align-items: center; gap: 0.5rem;">
+            <label for="tt-filter-faculty" style="margin-bottom: 0; font-size: 0.8125rem;">Filter by Faculty:</label>
+            <select id="tt-filter-faculty" class="form-control" style="width: auto; font-size: 0.8125rem; padding: 0.25rem 0.5rem;"></select>
+          </div>
+        </div>
+
+        <div class="table-responsive">
+          <table>
+            <thead>
+              <tr>
+                <th>Faculty</th>
+                <th>Day</th>
+                <th>Time Window</th>
+                <th>Class / Activity</th>
+                <th>Room</th>
+                <th style="width: 140px;">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="timetable-admin-body">
+              <!-- Populated via js/admin.js -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========================================================== -->
+    <!-- SECTION 3: TIMETABLE IMPORT (CSV / PDF) -->
+    <!-- ========================================================== -->
+    <section id="section-import" class="admin-section" style="display: none;">
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <h2>Import Timetable Files (CSV & Text PDF)</h2>
+            <div class="card-subtitle" style="margin-top: 0.25rem;">
+              Upload institutional timetable schedules. Records are normalized, validated, and previewed with inline correction before any database insertion.
+            </div>
+          </div>
+          <button id="btn-download-sample-csv" class="btn btn-secondary btn-sm">Download Sample CSV</button>
+        </div>
+
+        <!-- File Drop Area -->
+        <div id="timetable-file-drop" style="border: 2px dashed var(--border-color); border-radius: var(--radius-md); padding: 2.5rem 1.5rem; text-align: center; background: var(--surface-color); cursor: pointer; transition: all 0.2s ease; margin-bottom: 1.5rem;">
+          <div style="font-size: 2.5rem; margin-bottom: 0.5rem;">📁</div>
+          <h3 style="font-size: 1.1rem; margin-bottom: 0.25rem;">Click to browse or drag and drop timetable file</h3>
+          <p style="color: var(--text-muted); font-size: 0.875rem;">
+            Supports <strong>.CSV</strong> and <strong>text-based .PDF</strong> files (Standard tabular layout)
+          </p>
+          <input type="file" id="timetable-file-input" accept=".csv, .pdf" style="display: none;">
+        </div>
+
+        <!-- Preview & Correction Area -->
+        <div id="import-preview-section" style="display: none;">
+          <div class="card-header" style="border-top: 1px solid var(--border-color); padding-top: 1rem;">
+            <h3>Staged Timetable Records (Verification & Correction)</h3>
+            <div style="display: flex; gap: 0.5rem;">
+              <button id="btn-cancel-import" class="btn btn-secondary btn-sm">Discard</button>
+              <button id="btn-confirm-import" class="btn btn-primary btn-sm">Confirm & Commit Import</button>
+            </div>
+          </div>
+
+          <div id="import-summary-alert" class="alert"></div>
+
+          <div class="table-responsive">
+            <table>
+              <thead>
+                <tr>
+                  <th>Faculty Name</th>
+                  <th>Day</th>
+                  <th>Start</th>
+                  <th>End</th>
+                  <th>Activity</th>
+                  <th>Room</th>
+                  <th>Status</th>
+                  <th style="width: 50px;">Remove</th>
+                </tr>
+              </thead>
+              <tbody id="import-preview-body">
+                <!-- Staged rows dynamically populated via js/timetable-import.js -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ========================================================== -->
+    <!-- SECTION 4: AVAILABILITY OVERVIEW -->
+    <!-- ========================================================== -->
+    <section id="section-availability" class="admin-section" style="display: none;">
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <h2>Current Faculty Status Overview</h2>
+            <div class="card-subtitle" style="margin-top: 0.25rem;">
+              Real-time snapshot of what students currently see for each faculty member.
+            </div>
+          </div>
+        </div>
+
+        <div class="table-responsive" style="margin-bottom: 2rem;">
+          <table>
+            <thead>
+              <tr>
+                <th>Faculty</th>
+                <th>Department</th>
+                <th>Room</th>
+                <th>Current Status</th>
+                <th>Note</th>
+              </tr>
+            </thead>
+            <tbody id="admin-availability-body">
+              <!-- Populated dynamically -->
+            </tbody>
+          </table>
+        </div>
+
+        <div class="card-header">
+          <div>
+            <h3>All Active Overrides Across Campus</h3>
+            <div class="card-subtitle" style="margin-top: 0.25rem;">
+              Temporary schedule changes posted by faculty members.
+            </div>
+          </div>
+        </div>
+
+        <div class="table-responsive">
+          <table>
+            <thead>
+              <tr>
+                <th>Faculty</th>
+                <th>Date</th>
+                <th>Time Window</th>
+                <th>Status</th>
+                <th>Note</th>
+                <th style="width: 100px;">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="admin-overrides-body">
+              <!-- Populated dynamically -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========================================================== -->
+    <!-- SECTION 5: IMPORT HISTORY -->
+    <!-- ========================================================== -->
+    <section id="section-history" class="admin-section" style="display: none;">
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <h2>Timetable Import Audit History</h2>
+            <div class="card-subtitle" style="margin-top: 0.25rem;">
+              Permanent audit log of all batch file uploads, row statistics, and completion statuses.
+            </div>
+          </div>
+        </div>
+
+        <div class="table-responsive">
+          <table>
+            <thead>
+              <tr>
+                <th>File Name</th>
+                <th>Type</th>
+                <th>Uploaded By</th>
+                <th>Rows Detected</th>
+                <th>Rows Imported</th>
+                <th>Status</th>
+                <th>Date</th>
+              </tr>
+            </thead>
+            <tbody id="import-history-body">
+              <!-- Populated dynamically via js/admin.js -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Site Footer -->
+  <footer class="site-footer">
+    <div class="container footer-content">
+      <div>
+        <strong>Faculty Availability Tracker</strong> — College Administration Portal
+      </div>
+      <div>
+        Role-based access enforced via Auth module and Supabase RLS
+      </div>
+    </div>
+  </footer>
+
+  <script src="js/config.js"></script>
+  <script src="js/supabase-client.js"></script>
+  <script src="js/utils.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/admin.js"></script>
+  <script src="js/timetable-import.js"></script>
+</body>
+</html>

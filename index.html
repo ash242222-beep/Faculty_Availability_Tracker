@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Faculty Availability Tracker</title>
+  <meta name="description" content="A college web application allowing students and faculty to track and check faculty availability in real time.">
+  <meta property="og:title" content="Faculty Availability Tracker">
+  <meta property="og:description" content="A college web application allowing students and faculty to track and check faculty availability in real time.">
+  <meta property="og:type" content="website">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <!-- Site Header -->
+  <header class="site-header">
+    <div class="container header-content">
+      <a href="index.html" class="site-brand">
+        <div class="brand-icon">FA</div>
+        <div class="brand-text">
+          <h1>Faculty Availability Tracker</h1>
+        </div>
+        <span class="brand-badge">v0.1.0</span>
+      </a>
+
+      <nav class="site-nav">
+        <a href="student.html" class="nav-link">Student Portal</a>
+        <a href="faculty.html" class="nav-link">Faculty Portal</a>
+        <a href="admin.html" class="nav-link">Admin Portal</a>
+        <span id="header-user-info"></span>
+        <button id="header-logout-btn" class="btn btn-sm btn-secondary" style="display: none;">Log Out</button>
+      </nav>
+    </div>
+  </header>
+
+  <!-- Main Content -->
+  <main class="container" style="padding-top: 2rem; padding-bottom: 3rem;">
+    
+    <!-- Hero / Summary Banner -->
+    <div class="card" style="background: linear-gradient(to right, #ffffff, #f8fafc); border-left: 4px solid var(--primary);">
+      <div style="max-width: 800px;">
+        <h2 style="font-size: 1.6rem; margin-bottom: 0.5rem; color: var(--text-main);">
+          College Faculty Availability & Timetable System
+        </h2>
+        <p style="color: var(--text-muted); font-size: 1.05rem; margin-bottom: 1.5rem;">
+          Eliminate lost time searching empty cabins or waiting outside closed doors. Check whether a professor is in class, in a meeting, available in their cabin, or away at any selected date and time.
+        </p>
+        <div style="display: flex; gap: 0.75rem; flex-wrap: wrap;">
+          <a href="student.html" class="btn btn-primary btn-lg">Check Faculty Availability</a>
+          <a href="login.html" class="btn btn-secondary btn-lg">Faculty & Admin Sign In</a>
+        </div>
+      </div>
+    </div>
+
+    <!-- Quick Role Selector Cards -->
+    <div class="grid-3" style="margin-bottom: 2rem;">
+      
+      <!-- Student Card -->
+      <div class="card" style="display: flex; flex-direction: column; justify-content: space-between;">
+        <div>
+          <div class="card-header">
+            <h3>Student Access</h3>
+            <span class="badge-status badge-available">Read-Only</span>
+          </div>
+          <p style="color: var(--text-muted); font-size: 0.9375rem; margin-bottom: 1rem;">
+            Search all college faculty by name or department. Use the instant time calculator to check availability for any date or class period.
+          </p>
+          <ul style="font-size: 0.875rem; color: var(--text-main); margin-left: 1.25rem; margin-bottom: 1.25rem;">
+            <li>Instant status lookup (Available, In Class, etc.)</li>
+            <li>Department-wide directory search</li>
+            <li>Weekly timetable preview</li>
+          </ul>
+        </div>
+        <a href="student.html" class="btn btn-secondary" style="width: 100%;">Open Student Portal</a>
+      </div>
+
+      <!-- Faculty Card -->
+      <div class="card" style="display: flex; flex-direction: column; justify-content: space-between;">
+        <div>
+          <div class="card-header">
+            <h3>Faculty Access</h3>
+            <span class="badge-status badge-in_class">Status & Overrides</span>
+          </div>
+          <p style="color: var(--text-muted); font-size: 0.9375rem; margin-bottom: 1rem;">
+            Update your real-time status with one click. Post temporary availability overrides for rescheduled lectures or office hours.
+          </p>
+          <ul style="font-size: 0.875rem; color: var(--text-main); margin-left: 1.25rem; margin-bottom: 1.25rem;">
+            <li>One-click status buttons (Available, Present, etc.)</li>
+            <li>Manage schedule overrides with custom notes</li>
+            <li>Today's class schedule summary</li>
+          </ul>
+        </div>
+        <a href="faculty.html" class="btn btn-secondary" style="width: 100%;">Open Faculty Dashboard</a>
+      </div>
+
+      <!-- Admin Card -->
+      <div class="card" style="display: flex; flex-direction: column; justify-content: space-between;">
+        <div>
+          <div class="card-header">
+            <h3>Administration</h3>
+            <span class="badge-status badge-in_meeting">Full Control</span>
+          </div>
+          <p style="color: var(--text-muted); font-size: 0.9375rem; margin-bottom: 1rem;">
+            Manage the faculty roster, add or edit timetable records, and import college timetables directly from CSV or text-based PDF files.
+          </p>
+          <ul style="font-size: 0.875rem; color: var(--text-main); margin-left: 1.25rem; margin-bottom: 1.25rem;">
+            <li>Faculty roster (Add, Edit, Pause, Reactivate)</li>
+            <li>CSV and text-based PDF timetable importer</li>
+            <li>Overlap validation and audit history log</li>
+          </ul>
+        </div>
+        <a href="admin.html" class="btn btn-secondary" style="width: 100%;">Open Admin Panel</a>
+      </div>
+
+    </div>
+
+    <!-- Central Availability Resolution Engine Architecture -->
+    <div class="card">
+      <div class="card-header">
+        <h2>Central Availability Resolution Logic</h2>
+        <span class="badge-status badge-not_updated">Priority Rules</span>
+      </div>
+      <p style="color: var(--text-muted); margin-bottom: 1.25rem;">
+        The application guarantees consistent availability results through a strict single central resolver function: <code>getFacultyAvailability(facultyId, date, time)</code>.
+      </p>
+
+      <div class="table-responsive">
+        <table>
+          <thead>
+            <tr>
+              <th style="width: 80px;">Priority</th>
+              <th>Rule Condition</th>
+              <th>Evaluation Behavior</th>
+              <th>Output Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>#1</strong></td>
+              <td><strong>Inactive Account</strong></td>
+              <td>If faculty has <code>is_active = false</code> (paused by admin)</td>
+              <td><span class="badge-status badge-unavailable">Unavailable (Inactive)</span></td>
+            </tr>
+            <tr>
+              <td><strong>#2</strong></td>
+              <td><strong>Temporary Override</strong></td>
+              <td>Target date & time falls within an active <code>availability_overrides</code> window</td>
+              <td>Status from override (takes precedence over timetable)</td>
+            </tr>
+            <tr>
+              <td><strong>#3</strong></td>
+              <td><strong>Regular Timetable</strong></td>
+              <td>Day and time matches a scheduled class in <code>timetables</code></td>
+              <td><span class="badge-status badge-in_class">In Class</span> (Includes course & room)</td>
+            </tr>
+            <tr>
+              <td><strong>#4</strong></td>
+              <td><strong>Current Status</strong></td>
+              <td>If querying for current time, checks latest faculty status update</td>
+              <td>Available / Present / In Meeting / Unavailable</td>
+            </tr>
+            <tr>
+              <td><strong>#5</strong></td>
+              <td><strong>Default Fallback</strong></td>
+              <td>No schedule entry or status recorded</td>
+              <td><span class="badge-status badge-not_updated">Not Updated</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Quick Demo Reset / Diagnostic Utility -->
+    <div class="card" style="background: var(--surface-muted);">
+      <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+        <div>
+          <h3 style="font-size: 1rem; margin-bottom: 0.25rem;">Demo Environment Status</h3>
+          <p style="font-size: 0.875rem; color: var(--text-muted);">
+            Sample college dataset pre-loaded in browser storage. Includes 5 faculty members, weekly timetables, overrides, and CSV/PDF import testing.
+          </p>
+        </div>
+        <button id="btn-reset-demo" class="btn btn-secondary btn-sm" onclick="if(confirm('Reset sample demo data to original state?')) { window.DataStore.resetStoreToDefault(); window.location.reload(); }">
+          Reset Sample Demo Data
+        </button>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- Site Footer -->
+  <footer class="site-footer">
+    <div class="container footer-content">
+      <div>
+        <strong>Faculty Availability Tracker</strong> — College Timetable & Real-Time Availability System
+      </div>
+      <div>
+        Built with HTML5, CSS3, Vanilla JS & Supabase
+      </div>
+    </div>
+  </footer>
+
+  <!-- Scripts -->
+  <script src="js/config.js"></script>
+  <script src="js/supabase-client.js"></script>
+  <script src="js/utils.js"></script>
+  <script src="js/auth.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      Auth.initHeaderAuth();
+    });
+  </script>
+</body>
+</html>
