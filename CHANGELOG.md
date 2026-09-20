@@ -7,6 +7,31 @@ and this project adheres to Semantic Versioning.
 
 ---
 
+## [v0.3.0] - 2026-09-20 - Milestone 3: Faculty Management
+
+### Added
+- **Centralized Faculty Service Layer (`js/faculty-service.js`)**:
+  - Full CRUD abstraction supporting both live Supabase REST table operations and synchronous `DataStore` offline fallback.
+  - Multi-condition querying with department filtering, case-insensitive substring searching across name, designation, cabin, and email.
+  - Atomic state toggling (`toggleFacultyActive`) to soft-pause or reactivate faculty accounts without deleting timetables or historical records.
+  - Cross-tab & component reactivity: emits `faculty-data-changed` CustomEvents to trigger automatic UI refreshes across dashboards.
+- **Admin Faculty Management Refactor (`admin.html` & `js/admin.js`)**:
+  - Live debounced search bar and department filter dropdown directly above the faculty roster table.
+  - Asynchronous loading states and error handling during faculty fetch and mutations.
+  - Unified Add/Edit modal integrated with `FacultyService.addFaculty` and `FacultyService.updateFaculty`.
+  - Pause/Reactivate actions updating state directly in Supabase or local storage.
+  - Dynamic timetable faculty dropdown population fetching active faculty members.
+- **Student Dashboard Integration (`student.html` & `js/student.js`)**:
+  - Asynchronous faculty directory rendering directly consuming `FacultyService.getAllFaculty()`.
+  - Live debounced search input and reactive department filtering with real-time availability resolution.
+  - Paused/Inactive faculty state indicator badge on cards.
+  - Dynamic timetable preview and quick-check modals resolving directly from the faculty service.
+- **Faculty Dashboard Self-Management (`faculty.html` & `js/faculty.js`)**:
+  - Integrated "Edit Cabin / Designation" modal allowing faculty members to self-update their office cabin, designation, and display name.
+  - Asynchronous profile initialization resolving by authenticated user's `faculty_id` or `email`.
+
+---
+
 ## [v0.2.0] - 2026-09-20 - Milestone 2: Authentication
 
 ### Added

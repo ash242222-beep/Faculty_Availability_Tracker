@@ -32,6 +32,7 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   // ==========================================================
+  // ==========================================================
   // SECTION 1: FACULTY MANAGEMENT
   // ==========================================================
   const facultyTableBody = document.getElementById('faculty-table-body');
@@ -41,44 +42,76 @@ document.addEventListener('DOMContentLoaded', () => {
   const btnCloseFacultyModal = document.getElementById('btn-close-faculty-modal');
   const facultyModalTitle = document.getElementById('faculty-modal-title');
   const facultyEditId = document.getElementById('faculty-edit-id');
+  const facultySearchInput = document.getElementById('admin-faculty-search');
+  const facultyDeptFilter = document.getElementById('admin-faculty-dept-filter');
 
-  function renderFacultyTable() {
-    const store = window.DataStore.getStore();
+  let facultyCache = [];
+
+  async function renderFacultyTable() {
     if (!facultyTableBody) return;
 
-    if (!store.faculty || store.faculty.length === 0) {
-      facultyTableBody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--text-muted); padding: 1.5rem;">No faculty members registered.</td></tr>`;
-      return;
+    const query = facultySearchInput ? facultySearchInput.value.trim() : '';
+    const selectedDept = facultyDeptFilter ? facultyDeptFilter.value : 'All Departments';
+
+    facultyTableBody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--text-muted); padding: 1.5rem;">Loading faculty records...</td></tr>`;
+
+    try {
+      const facultyList = await window.FacultyService.getAllFaculty({
+        department: selectedDept,
+        searchQuery: query
+      });
+
+      facultyCache = facultyList;
+
+      if (!facultyList || facultyList.length === 0) {
+        facultyTableBody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--text-muted); padding: 1.5rem;">No matching faculty members found.</td></tr>`;
+        return;
+      }
+
+      facultyTableBody.innerHTML = facultyList.map(f => {
+        const statusBadge = f.is_active !== false
+          ? `<span class="badge-status badge-available">Active</span>`
+          : `<span class="badge-status badge-unavailable">Paused (Inactive)</span>`;
+
+        const pauseActionBtn = f.is_active !== false
+          ? `<button class="btn btn-secondary btn-sm" onclick="window.toggleFacultyActive('${f.id}', false)">Pause</button>`
+          : `<button class="btn btn-primary btn-sm" onclick="window.toggleFacultyActive('${f.id}', true)">Reactivate</button>`;
+
+        return `
+          <tr>
+            <td><strong>${f.full_name}</strong><div style="font-size: 0.75rem; color: var(--text-muted);">${f.email}</div></td>
+            <td>${f.department}</td>
+            <td>${f.designation}</td>
+            <td>${f.room}</td>
+            <td>${statusBadge}</td>
+            <td>
+              <div style="display: flex; gap: 0.35rem;">
+                <button class="btn btn-secondary btn-sm" onclick="window.editFaculty('${f.id}')">Edit</button>
+                ${pauseActionBtn}
+              </div>
+            </td>
+          </tr>
+        `;
+      }).join('');
+
+      populateFacultyDropdowns();
+    } catch (err) {
+      console.error('Error loading faculty table:', err);
+      facultyTableBody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--danger); padding: 1.5rem;">Error loading faculty records.</td></tr>`;
     }
+  }
 
-    facultyTableBody.innerHTML = store.faculty.map(f => {
-      const statusBadge = f.is_active 
-        ? `<span class="badge-status badge-available">Active</span>`
-        : `<span class="badge-status badge-unavailable">Paused (Inactive)</span>`;
+  // Live filter handlers
+  let adminSearchTimer = null;
+  if (facultySearchInput) {
+    facultySearchInput.addEventListener('input', () => {
+      clearTimeout(adminSearchTimer);
+      adminSearchTimer = setTimeout(renderFacultyTable, 200);
+    });
+  }
 
-      const pauseActionBtn = f.is_active
-        ? `<button class="btn btn-secondary btn-sm" onclick="window.toggleFacultyActive('${f.id}', false)">Pause</button>`
-        : `<button class="btn btn-primary btn-sm" onclick="window.toggleFacultyActive('${f.id}', true)">Reactivate</button>`;
-
-      return `
-        <tr>
-          <td><strong>${f.full_name}</strong></td>
-          <td>${f.department}</td>
-          <td>${f.designation}</td>
-          <td>${f.room}</td>
-          <td>${statusBadge}</td>
-          <td>
-            <div style="display: flex; gap: 0.35rem;">
-              <button class="btn btn-secondary btn-sm" onclick="window.editFaculty('${f.id}')">Edit</button>
-              ${pauseActionBtn}
-            </div>
-          </td>
-        </tr>
-      `;
-    }).join('');
-
-    // Also refresh faculty options in timetable dropdowns
-    populateFacultyDropdowns();
+  if (facultyDeptFilter) {
+    facultyDeptFilter.addEventListener('change', renderFacultyTable);
   }
 
   // Open Add Faculty modal
@@ -99,9 +132,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Handle Faculty Form Submit (Add / Edit)
   if (facultyForm) {
-    facultyForm.addEventListener('submit', (e) => {
+    facultyForm.addEventListener('submit', async (e) => {
       e.preventDefault();
-      const store = window.DataStore.getStore();
       const editId = facultyEditId.value;
 
       const name = document.getElementById('faculty-name').value.trim();
@@ -115,39 +147,58 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
       }
 
-      if (editId) {
-        const idx = store.faculty.findIndex(f => f.id === editId);
-        if (idx >= 0) {
-          store.faculty[idx].full_name = name;
-          store.faculty[idx].email = email;
-          store.faculty[idx].department = dept;
-          store.faculty[idx].designation = designation;
-          store.faculty[idx].room = room;
-        }
-      } else {
-        const newFaculty = {
-          id: 'f-' + Date.now(),
-          full_name: name,
-          email: email,
-          department: dept,
-          designation: designation,
-          room: room,
-          is_active: true,
-          created_at: new Date().toISOString()
-        };
-        store.faculty.push(newFaculty);
+      const submitBtn = facultyForm.querySelector('button[type="submit"]');
+      if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Saving...';
       }
 
-      window.DataStore.saveStore(store);
-      facultyModal.style.display = 'none';
-      renderFacultyTable();
-      alert(editId ? 'Faculty information updated.' : 'New faculty member added successfully.');
+      try {
+        if (editId) {
+          const res = await window.FacultyService.updateFaculty(editId, {
+            full_name: name,
+            email: email,
+            department: dept,
+            designation: designation,
+            room: room
+          });
+          if (!res.success) {
+            alert('Error updating faculty: ' + res.error);
+            return;
+          }
+        } else {
+          const res = await window.FacultyService.addFaculty({
+            full_name: name,
+            email: email,
+            department: dept,
+            designation: designation,
+            room: room
+          });
+          if (!res.success) {
+            alert('Error adding faculty: ' + res.error);
+            return;
+          }
+        }
+
+        facultyModal.style.display = 'none';
+        await renderFacultyTable();
+        alert(editId ? 'Faculty information updated successfully.' : 'New faculty member added successfully.');
+      } catch (err) {
+        alert('Failed to save faculty: ' + err.message);
+      } finally {
+        if (submitBtn) {
+          submitBtn.disabled = false;
+          submitBtn.textContent = 'Save Faculty';
+        }
+      }
     });
   }
 
-  window.editFaculty = function(facultyId) {
-    const store = window.DataStore.getStore();
-    const f = (store.faculty || []).find(item => item.id === facultyId);
+  window.editFaculty = async function(facultyId) {
+    let f = facultyCache.find(item => item.id === facultyId);
+    if (!f) {
+      f = await window.FacultyService.getFacultyById(facultyId);
+    }
     if (!f) return;
 
     facultyEditId.value = f.id;
@@ -162,40 +213,53 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   // Pause / Reactivate (Soft-delete via is_active = false)
-  window.toggleFacultyActive = function(facultyId, newActiveState) {
-    const store = window.DataStore.getStore();
-    const f = (store.faculty || []).find(item => item.id === facultyId);
+  window.toggleFacultyActive = async function(facultyId, newActiveState) {
+    let f = facultyCache.find(item => item.id === facultyId);
+    if (!f) {
+      f = await window.FacultyService.getFacultyById(facultyId);
+    }
     if (!f) return;
 
     const actionName = newActiveState ? 'reactivate' : 'pause';
     if (!confirm(`Are you sure you want to ${actionName} the account of ${f.full_name}?`)) return;
 
-    f.is_active = newActiveState;
-    window.DataStore.saveStore(store);
-    renderFacultyTable();
-    alert(`Account for ${f.full_name} has been ${newActiveState ? 'reactivated' : 'paused'}.`);
+    try {
+      const res = await window.FacultyService.toggleFacultyActive(facultyId, newActiveState);
+      if (res.success) {
+        await renderFacultyTable();
+        alert(`Account for ${f.full_name} has been ${newActiveState ? 'reactivated' : 'paused'}.`);
+      } else {
+        alert('Failed to update status: ' + res.error);
+      }
+    } catch (err) {
+      alert('Error updating status: ' + err.message);
+    }
   };
 
-  function populateFacultyDropdowns() {
-    const store = window.DataStore.getStore();
+  async function populateFacultyDropdowns() {
     const facultySelects = [
       document.getElementById('tt-faculty-select'),
       document.getElementById('tt-filter-faculty')
     ];
 
-    facultySelects.forEach(selectEl => {
-      if (!selectEl) return;
-      const currentVal = selectEl.value;
-      const isFilter = selectEl.id === 'tt-filter-faculty';
+    try {
+      const facultyList = await window.FacultyService.getAllFaculty();
+      facultySelects.forEach(selectEl => {
+        if (!selectEl) return;
+        const currentVal = selectEl.value;
+        const isFilter = selectEl.id === 'tt-filter-faculty';
 
-      let optionsHtml = isFilter ? '<option value="all">All Faculty</option>' : '<option value="">-- Select Faculty --</option>';
-      optionsHtml += (store.faculty || []).map(f => `
-        <option value="${f.id}">${f.full_name} (${f.department})</option>
-      `).join('');
+        let optionsHtml = isFilter ? '<option value="all">All Faculty</option>' : '<option value="">-- Select Faculty --</option>';
+        optionsHtml += (facultyList || []).map(f => `
+          <option value="${f.id}">${f.full_name} (${f.department})</option>
+        `).join('');
 
-      selectEl.innerHTML = optionsHtml;
-      if (currentVal) selectEl.value = currentVal;
-    });
+        selectEl.innerHTML = optionsHtml;
+        if (currentVal) selectEl.value = currentVal;
+      });
+    } catch (e) {
+      console.warn('Dropdown populate notice:', e);
+    }
   }
 
   // ==========================================================

@@ -1,31 +1,121 @@
 /**
  * Faculty Availability Tracker - Faculty Dashboard Script
- * Version: v0.1.0
+ * Version: v0.3.0 (Milestone 3 - Faculty Management)
  */
 
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
   // Check auth - allows faculty & admin
   Auth.requireRole(['faculty', 'admin']);
   Auth.initHeaderAuth();
 
   const user = Auth.getCurrentUser();
-  const store = window.DataStore.getStore();
+  const store = window.DataStore ? window.DataStore.getStore() : { faculty: [], timetables: [], availability: [], overrides: [] };
 
-  // Find faculty profile (defaults to Dr. Rahul Sharma for demo if not mapped)
-  let faculty = (store.faculty || []).find(f => f.email.toLowerCase() === user.email.toLowerCase()) ||
-                (store.faculty || []).find(f => f.id === user.faculty_id) ||
-                store.faculty[0];
-
-  // Faculty profile card
+  // Faculty profile card elements
   const profileNameEl = document.getElementById('faculty-profile-name');
   const profileDeptEl = document.getElementById('faculty-profile-dept');
   const profileRoomEl = document.getElementById('faculty-profile-room');
   const profileEmailEl = document.getElementById('faculty-profile-email');
 
-  if (profileNameEl) profileNameEl.textContent = faculty.full_name;
-  if (profileDeptEl) profileDeptEl.textContent = faculty.department + ' — ' + faculty.designation;
-  if (profileRoomEl) profileRoomEl.textContent = faculty.room;
-  if (profileEmailEl) profileEmailEl.textContent = faculty.email;
+  // Edit Profile Modal elements
+  const btnOpenEditProfile = document.getElementById('btn-open-edit-profile');
+  const profileModal = document.getElementById('faculty-profile-modal');
+  const btnCloseProfileModal = document.getElementById('btn-close-profile-modal');
+  const btnCancelProfileModal = document.getElementById('btn-cancel-profile-modal');
+  const profileForm = document.getElementById('faculty-profile-form');
+  const editProfileName = document.getElementById('edit-profile-name');
+  const editProfileDesignation = document.getElementById('edit-profile-designation');
+  const editProfileRoom = document.getElementById('edit-profile-room');
+
+  // Find faculty profile from FacultyService
+  let faculty = null;
+  try {
+    if (user.faculty_id) {
+      faculty = await window.FacultyService.getFacultyById(user.faculty_id);
+    }
+    if (!faculty && user.email) {
+      const list = await window.FacultyService.getAllFaculty();
+      faculty = (list || []).find(f => f.email.toLowerCase() === user.email.toLowerCase());
+    }
+    if (!faculty) {
+      // Fallback to demo default
+      const list = await window.FacultyService.getAllFaculty();
+      faculty = list && list.length > 0 ? list[0] : null;
+    }
+  } catch (err) {
+    console.warn('Faculty fetch notice:', err);
+  }
+
+  if (!faculty) {
+    faculty = {
+      id: user.faculty_id || 'f1-rahul-sharma',
+      full_name: user.name || 'Dr. Rahul Sharma',
+      department: user.department || 'Computer Engineering',
+      designation: 'Associate Professor',
+      room: user.room || 'Cabin 12',
+      email: user.email || 'rahul.sharma@college.edu'
+    };
+  }
+
+  function updateProfileUI() {
+    if (profileNameEl) profileNameEl.textContent = faculty.full_name;
+    if (profileDeptEl) profileDeptEl.textContent = faculty.department + ' — ' + (faculty.designation || 'Faculty Member');
+    if (profileRoomEl) profileRoomEl.textContent = faculty.room;
+    if (profileEmailEl) profileEmailEl.textContent = faculty.email;
+  }
+  updateProfileUI();
+
+  // Edit Profile Modal Handlers
+  if (btnOpenEditProfile) {
+    btnOpenEditProfile.addEventListener('click', () => {
+      if (editProfileName) editProfileName.value = faculty.full_name;
+      if (editProfileDesignation) editProfileDesignation.value = faculty.designation || '';
+      if (editProfileRoom) editProfileRoom.value = faculty.room || '';
+      if (profileModal) profileModal.style.display = 'flex';
+    });
+  }
+
+  function closeProfileModal() {
+    if (profileModal) profileModal.style.display = 'none';
+  }
+
+  if (btnCloseProfileModal) btnCloseProfileModal.addEventListener('click', closeProfileModal);
+  if (btnCancelProfileModal) btnCancelProfileModal.addEventListener('click', closeProfileModal);
+
+  if (profileForm) {
+    profileForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const newName = editProfileName.value.trim();
+      const newDesig = editProfileDesignation.value.trim();
+      const newRoom = editProfileRoom.value.trim();
+
+      if (!newName || !newRoom) {
+        alert('Name and Room are required.');
+        return;
+      }
+
+      try {
+        const updateRes = await window.FacultyService.updateFaculty(faculty.id, {
+          full_name: newName,
+          designation: newDesig,
+          room: newRoom
+        });
+
+        if (updateRes.success) {
+          faculty.full_name = newName;
+          faculty.designation = newDesig;
+          faculty.room = newRoom;
+          updateProfileUI();
+          closeProfileModal();
+          alert('Profile updated successfully.');
+        } else {
+          alert('Failed to update profile: ' + updateRes.error);
+        }
+      } catch (err) {
+        alert('Error updating profile: ' + err.message);
+      }
+    });
+  }
 
   // Current status buttons
   const statusButtons = document.querySelectorAll('.status-pill-btn');
@@ -75,16 +165,17 @@ document.addEventListener('DOMContentLoaded', () => {
       if (existingIdx >= 0) {
         currentStore.availability[existingIdx] = newRecord;
       } else {
-        if (!currentStore.availability) currentStore.availability = [];
         currentStore.availability.push(newRecord);
       }
 
       window.DataStore.saveStore(currentStore);
 
+      // Show alert confirmation
       if (statusSaveAlert) {
         statusSaveAlert.style.display = 'block';
         statusSaveAlert.className = 'alert alert-success';
-        statusSaveAlert.textContent = `Status saved as "${window.Utils.getStatusDisplay(selectedStatus).label}" at ${new Date().toLocaleTimeString()}.`;
+        statusSaveAlert.textContent = `Status updated to "${window.Utils.getStatusDisplay(selectedStatus).label}" at ${window.Utils.formatTime12Hour(new Date().toTimeString().slice(0, 5))}.`;
+
         setTimeout(() => {
           statusSaveAlert.style.display = 'none';
         }, 4000);
@@ -92,45 +183,60 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // Today's schedule & Weekly timetable
+  // ==========================================================
+  // SECTION 2: TODAY'S SCHEDULE & WEEKLY TIMETABLE
+  // ==========================================================
+  const todayScheduleContainer = document.getElementById('today-schedule-container');
+  const weeklyTimetableBody = document.getElementById('weekly-timetable-body');
+
   function renderTimetables() {
     const currentStore = window.DataStore.getStore();
-    const todayName = window.Utils.getDayName(new Date().toISOString().split('T')[0]);
-    const facultyTimetables = (currentStore.timetables || []).filter(t => t.faculty_id === faculty.id && t.is_active !== false);
+    const myTimetables = (currentStore.timetables || []).filter(t => t.faculty_id === faculty.id && t.is_active !== false);
 
-    // Today's schedule
-    const todayTableBody = document.getElementById('today-schedule-body');
-    const todayClasses = facultyTimetables.filter(t => t.day_of_week === todayName);
+    const todayDayName = window.Utils.getDayName(new Date().toISOString().split('T')[0]);
+    const todayClasses = myTimetables.filter(t => t.day_of_week === todayDayName);
     todayClasses.sort((a, b) => window.Utils.compareTime(a.start_time, b.start_time));
 
-    if (todayTableBody) {
+    // Render Today's Schedule Card
+    if (todayScheduleContainer) {
       if (todayClasses.length === 0) {
-        todayTableBody.innerHTML = `<tr><td colspan="3" style="text-align: center; color: var(--text-muted); padding: 1.5rem;">No classes scheduled for today (${todayName}).</td></tr>`;
+        todayScheduleContainer.innerHTML = `
+          <div style="text-align: center; padding: 1.5rem; color: var(--text-muted);">
+            No scheduled classes or labs for today (${todayDayName}).
+          </div>
+        `;
       } else {
-        todayTableBody.innerHTML = todayClasses.map(c => `
-          <tr>
-            <td><strong>${window.Utils.formatTime12Hour(c.start_time)} - ${window.Utils.formatTime12Hour(c.end_time)}</strong></td>
-            <td><strong>${c.activity}</strong></td>
-            <td>${c.room || faculty.room}</td>
-          </tr>
-        `).join('');
+        todayScheduleContainer.innerHTML = `
+          <div style="display: flex; flex-direction: column; gap: 0.6rem;">
+            ${todayClasses.map(c => `
+              <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.6rem 0.8rem; background: var(--surface-muted); border-radius: var(--radius-sm);">
+                <div>
+                  <strong>${c.activity}</strong>
+                  <div style="font-size: 0.8125rem; color: var(--text-muted);">${c.room || faculty.room}</div>
+                </div>
+                <div style="font-size: 0.875rem; font-weight: 600;">
+                  ${window.Utils.formatTime12Hour(c.start_time)} - ${window.Utils.formatTime12Hour(c.end_time)}
+                </div>
+              </div>
+            `).join('')}
+          </div>
+        `;
       }
     }
 
-    // Weekly schedule
-    const weeklyTableBody = document.getElementById('weekly-schedule-body');
-    if (weeklyTableBody) {
-      const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-      facultyTimetables.sort((a, b) => {
-        const dDiff = days.indexOf(a.day_of_week) - days.indexOf(b.day_of_week);
-        if (dDiff !== 0) return dDiff;
-        return window.Utils.compareTime(a.start_time, b.start_time);
-      });
-
-      if (facultyTimetables.length === 0) {
-        weeklyTableBody.innerHTML = `<tr><td colspan="4" style="text-align: center; color: var(--text-muted); padding: 1.5rem;">No regular timetable assigned yet.</td></tr>`;
+    // Render Full Weekly Timetable Table
+    if (weeklyTimetableBody) {
+      if (myTimetables.length === 0) {
+        weeklyTimetableBody.innerHTML = `<tr><td colspan="4" style="text-align: center; color: var(--text-muted); padding: 1.5rem;">No regular timetable registered for your account.</td></tr>`;
       } else {
-        weeklyTableBody.innerHTML = facultyTimetables.map(t => `
+        const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+        myTimetables.sort((a, b) => {
+          const dayDiff = days.indexOf(a.day_of_week) - days.indexOf(b.day_of_week);
+          if (dayDiff !== 0) return dayDiff;
+          return window.Utils.compareTime(a.start_time, b.start_time);
+        });
+
+        weeklyTimetableBody.innerHTML = myTimetables.map(t => `
           <tr>
             <td><strong>${t.day_of_week}</strong></td>
             <td>${window.Utils.formatTime12Hour(t.start_time)} - ${window.Utils.formatTime12Hour(t.end_time)}</td>
@@ -142,109 +248,119 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  // Overrides management
-  const overridesTableBody = document.getElementById('overrides-table-body');
+  // ==========================================================
+  // SECTION 3: TEMPORARY AVAILABILITY OVERRIDES
+  // ==========================================================
   const overrideForm = document.getElementById('override-form');
+  const overridesTableBody = document.getElementById('overrides-table-body');
+  const overrideEditIdInput = document.getElementById('override-edit-id');
   const overrideDateInput = document.getElementById('override-date');
   const overrideStartInput = document.getElementById('override-start-time');
   const overrideEndInput = document.getElementById('override-end-time');
   const overrideStatusSelect = document.getElementById('override-status');
   const overrideNoteInput = document.getElementById('override-note');
-  const overrideEditIdInput = document.getElementById('override-edit-id');
-  const btnCancelOverrideEdit = document.getElementById('btn-cancel-override-edit');
   const btnSubmitOverride = document.getElementById('btn-submit-override');
+  const btnCancelOverrideEdit = document.getElementById('btn-cancel-override-edit');
 
-  // Set default override date to today
-  if (overrideDateInput) overrideDateInput.value = new Date().toISOString().split('T')[0];
+  // Set default date to today
+  if (overrideDateInput) {
+    overrideDateInput.value = new Date().toISOString().split('T')[0];
+  }
 
   function renderOverrides() {
     const currentStore = window.DataStore.getStore();
-    const facultyOverrides = (currentStore.overrides || []).filter(ov => ov.faculty_id === faculty.id);
+    const myOverrides = (currentStore.overrides || []).filter(o => o.faculty_id === faculty.id);
 
-    if (overridesTableBody) {
-      if (facultyOverrides.length === 0) {
-        overridesTableBody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--text-muted); padding: 1.5rem;">No temporary availability overrides active.</td></tr>`;
-        return;
-      }
+    // Sort by date then start_time
+    myOverrides.sort((a, b) => {
+      if (a.date !== b.date) return a.date.localeCompare(b.date);
+      return window.Utils.compareTime(a.start_time, b.start_time);
+    });
 
-      overridesTableBody.innerHTML = facultyOverrides.map(ov => `
+    if (!overridesTableBody) return;
+
+    if (myOverrides.length === 0) {
+      overridesTableBody.innerHTML = `<tr><td colspan="5" style="text-align: center; color: var(--text-muted); padding: 1.5rem;">No temporary overrides currently active.</td></tr>`;
+      return;
+    }
+
+    overridesTableBody.innerHTML = myOverrides.map(o => {
+      const statusBadge = window.Utils.renderStatusBadge(o.status);
+      return `
         <tr>
-          <td><strong>${ov.date}</strong></td>
-          <td>${window.Utils.formatTime12Hour(ov.start_time)} - ${window.Utils.formatTime12Hour(ov.end_time)}</td>
-          <td>${window.Utils.renderStatusBadge(ov.status)}</td>
-          <td>${ov.note || '<span style="color: var(--text-muted)">—</span>'}</td>
+          <td><strong>${o.date}</strong> (${window.Utils.getDayName(o.date)})</td>
+          <td>${window.Utils.formatTime12Hour(o.start_time)} - ${window.Utils.formatTime12Hour(o.end_time)}</td>
+          <td>${statusBadge}</td>
+          <td>${o.note || '<span style="color: var(--text-muted);">None</span>'}</td>
           <td>
             <div style="display: flex; gap: 0.35rem;">
-              <button class="btn btn-secondary btn-sm" onclick="window.editOverride('${ov.id}')">Edit</button>
-              <button class="btn btn-danger btn-sm" onclick="window.deleteOverride('${ov.id}')">Delete</button>
+              <button class="btn btn-secondary btn-sm" onclick="window.editOverride('${o.id}')">Edit</button>
+              <button class="btn btn-danger btn-sm" onclick="window.deleteOverride('${o.id}')">Delete</button>
             </div>
           </td>
         </tr>
-      `).join('');
-    }
+      `;
+    }).join('');
   }
 
   // Handle override form submit
   if (overrideForm) {
     overrideForm.addEventListener('submit', (e) => {
       e.preventDefault();
-      const dateVal = overrideDateInput.value;
-      const startVal = overrideStartInput.value;
-      const endVal = overrideEndInput.value;
-      const statusVal = overrideStatusSelect.value;
-      const noteVal = overrideNoteInput.value.trim();
+      const currentStore = window.DataStore.getStore();
       const editId = overrideEditIdInput.value;
 
-      // Validation: start time < end time
-      if (window.Utils.compareTime(startVal, endVal) >= 0) {
-        alert('Validation Error: End time must be strictly after start time.');
+      const date = overrideDateInput.value;
+      const start = overrideStartInput.value;
+      const end = overrideEndInput.value;
+      const status = overrideStatusSelect.value;
+      const note = overrideNoteInput.value.trim();
+
+      // Validate time window
+      if (window.Utils.compareTime(start, end) >= 0) {
+        alert('Validation Error: End time must be after start time.');
         return;
       }
 
-      const currentStore = window.DataStore.getStore();
-      if (!currentStore.overrides) currentStore.overrides = [];
-
       if (editId) {
-        // Edit existing
-        const idx = currentStore.overrides.findIndex(o => o.id === editId);
+        const idx = (currentStore.overrides || []).findIndex(o => o.id === editId);
         if (idx >= 0) {
           currentStore.overrides[idx] = {
             ...currentStore.overrides[idx],
-            date: dateVal,
-            start_time: startVal,
-            end_time: endVal,
-            status: statusVal,
-            note: noteVal,
-            updated_at: new Date().toISOString()
+            date,
+            start_time: start,
+            end_time: end,
+            status,
+            note
           };
         }
-        overrideEditIdInput.value = '';
-        if (btnSubmitOverride) btnSubmitOverride.textContent = 'Add Override';
+        btnSubmitOverride.textContent = 'Add Override';
         if (btnCancelOverrideEdit) btnCancelOverrideEdit.style.display = 'none';
       } else {
-        // Add new
         const newOverride = {
           id: 'ov-' + Date.now(),
           faculty_id: faculty.id,
-          date: dateVal,
-          start_time: startVal,
-          end_time: endVal,
-          status: statusVal,
-          note: noteVal,
+          date,
+          start_time: start,
+          end_time: end,
+          status,
+          note,
           created_at: new Date().toISOString()
         };
+        currentStore.overrides = currentStore.overrides || [];
         currentStore.overrides.push(newOverride);
       }
 
       window.DataStore.saveStore(currentStore);
+      overrideEditIdInput.value = '';
       overrideForm.reset();
       overrideDateInput.value = new Date().toISOString().split('T')[0];
       renderOverrides();
-      alert('Availability override saved successfully.');
+      alert(editId ? 'Override updated.' : 'Temporary override registered successfully.');
     });
   }
 
-  // Edit override
+  // Global helper for edit override
   window.editOverride = function(overrideId) {
     const currentStore = window.DataStore.getStore();
     const ov = (currentStore.overrides || []).find(o => o.id === overrideId);

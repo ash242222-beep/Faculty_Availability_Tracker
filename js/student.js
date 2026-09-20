@@ -1,6 +1,6 @@
 /**
  * Faculty Availability Tracker - Student Dashboard Script
- * Version: v0.1.0
+ * Version: v0.3.0 (Milestone 3 - Faculty Management)
  */
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -41,90 +41,113 @@ document.addEventListener('DOMContentLoaded', () => {
     ).join('');
   }
 
-  // Load and render faculty cards
-  function renderFacultyList() {
-    const store = window.DataStore.getStore();
+  // In-memory cache of currently loaded faculty
+  let currentLoadedFaculty = [];
+
+  // Load and render faculty cards asynchronously
+  async function renderFacultyList() {
     const query = (searchInput ? searchInput.value : '').toLowerCase().trim();
     const selectedDept = departmentFilter ? departmentFilter.value : 'All Departments';
 
-    const facultyList = (store.faculty || []).filter(faculty => {
-      // If inactive, still show with Inactive status for transparency
-      const matchesSearch = faculty.full_name.toLowerCase().includes(query) ||
-                            faculty.department.toLowerCase().includes(query) ||
-                            faculty.designation.toLowerCase().includes(query) ||
-                            faculty.room.toLowerCase().includes(query);
-
-      const matchesDept = (selectedDept === 'All Departments') || (faculty.department === selectedDept);
-
-      return matchesSearch && matchesDept;
-    });
-
-    if (facultyList.length === 0) {
-      facultyCardsGrid.innerHTML = '';
-      if (emptyState) emptyState.style.display = 'block';
-      return;
-    }
-
-    if (emptyState) emptyState.style.display = 'none';
-
-    facultyCardsGrid.innerHTML = facultyList.map(faculty => {
-      // Calculate current real-time availability for right now
-      const queryDate = checkDateInput ? checkDateInput.value : todayStr;
-      const queryTime = checkTimeInput ? checkTimeInput.value : `${currentHours}:${currentMinutes}`;
-      const avail = window.Utils.getFacultyAvailability(faculty.id, queryDate, queryTime);
-      const statusBadge = window.Utils.renderStatusBadge(avail.status);
-
-      let contextNote = '';
-      if (avail.activity) {
-        contextNote = `<div style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.25rem;">Class: <strong>${avail.activity}</strong></div>`;
-      } else if (avail.note) {
-        contextNote = `<div style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.25rem;">Note: <em>"${avail.note}"</em></div>`;
+    try {
+      if (facultyCardsGrid && currentLoadedFaculty.length === 0) {
+        facultyCardsGrid.innerHTML = `<div style="grid-column: 1 / -1; text-align: center; color: var(--text-muted); padding: 2rem;">Loading faculty directory...</div>`;
       }
 
-      return `
-        <div class="card" id="card-${faculty.id}" style="display: flex; flex-direction: column; justify-content: space-between;">
-          <div>
-            <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 0.75rem; margin-bottom: 0.5rem;">
-              <div>
-                <h3 style="font-size: 1.1rem; font-weight: 700;">${faculty.full_name}</h3>
-                <div style="font-size: 0.875rem; color: var(--text-muted);">${faculty.designation}</div>
+      const facultyList = await window.FacultyService.getAllFaculty({
+        department: selectedDept,
+        searchQuery: query
+      });
+
+      currentLoadedFaculty = facultyList;
+
+      if (!facultyList || facultyList.length === 0) {
+        facultyCardsGrid.innerHTML = '';
+        if (emptyState) emptyState.style.display = 'block';
+        return;
+      }
+
+      if (emptyState) emptyState.style.display = 'none';
+
+      const queryDate = checkDateInput ? checkDateInput.value : todayStr;
+      const queryTime = checkTimeInput ? checkTimeInput.value : `${currentHours}:${currentMinutes}`;
+
+      facultyCardsGrid.innerHTML = facultyList.map(faculty => {
+        // Calculate current real-time availability for target date & time
+        const avail = window.Utils.getFacultyAvailability(faculty.id, queryDate, queryTime);
+        const statusBadge = window.Utils.renderStatusBadge(avail.status);
+
+        let contextNote = '';
+        if (avail.activity) {
+          contextNote = `<div style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.25rem;">Class: <strong>${avail.activity}</strong></div>`;
+        } else if (avail.note) {
+          contextNote = `<div style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.25rem;">Note: <em>"${avail.note}"</em></div>`;
+        }
+
+        const isPaused = faculty.is_active === false;
+        const pausedBanner = isPaused ? `<span class="badge-status badge-unavailable" style="font-size: 0.7rem; margin-left: 0.5rem;">Paused</span>` : '';
+
+        return `
+          <div class="card" id="card-${faculty.id}" style="display: flex; flex-direction: column; justify-content: space-between; opacity: ${isPaused ? '0.75' : '1'};">
+            <div>
+              <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 0.75rem; margin-bottom: 0.5rem;">
+                <div>
+                  <h3 style="font-size: 1.1rem; font-weight: 700;">${faculty.full_name} ${pausedBanner}</h3>
+                  <div style="font-size: 0.875rem; color: var(--text-muted);">${faculty.designation}</div>
+                </div>
+                <div>${statusBadge}</div>
               </div>
-              <div>${statusBadge}</div>
+
+              <div style="font-size: 0.875rem; margin-bottom: 0.75rem;">
+                <div><strong>Department:</strong> ${faculty.department}</div>
+                <div><strong>Office:</strong> ${faculty.room}</div>
+                <div><strong>Email:</strong> ${faculty.email}</div>
+              </div>
+
+              <div style="background: var(--surface-muted); padding: 0.6rem 0.75rem; border-radius: var(--radius-sm); margin-bottom: 1rem;">
+                <div style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 700; color: var(--text-muted);">
+                  Status at ${window.Utils.formatTime12Hour(queryTime)}:
+                </div>
+                <div style="margin-top: 0.2rem; display: flex; align-items: center; gap: 0.5rem;">
+                  ${statusBadge}
+                </div>
+                ${contextNote}
+              </div>
             </div>
 
-            <div style="font-size: 0.875rem; margin-bottom: 0.75rem;">
-              <div><strong>Department:</strong> ${faculty.department}</div>
-              <div><strong>Office:</strong> ${faculty.room}</div>
-              <div><strong>Email:</strong> ${faculty.email}</div>
-            </div>
-
-            <div style="background: var(--surface-muted); padding: 0.6rem 0.75rem; border-radius: var(--radius-sm); margin-bottom: 1rem;">
-              <div style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 700; color: var(--text-muted);">
-                Status at ${window.Utils.formatTime12Hour(queryTime)}:
-              </div>
-              <div style="margin-top: 0.2rem; display: flex; align-items: center; gap: 0.5rem;">
-                ${window.Utils.renderStatusBadge(avail.status)}
-              </div>
-              ${contextNote}
+            <div style="display: flex; gap: 0.5rem; border-top: 1px solid var(--border-color); padding-top: 0.75rem;">
+              <button class="btn btn-secondary btn-sm" onclick="window.viewTimetable('${faculty.id}')" style="flex: 1;">
+                View Weekly Timetable
+              </button>
+              <button class="btn btn-primary btn-sm" onclick="window.quickCheck('${faculty.id}')">
+                Check Time
+              </button>
             </div>
           </div>
-
-          <div style="display: flex; gap: 0.5rem; border-top: 1px solid var(--border-color); padding-top: 0.75rem;">
-            <button class="btn btn-secondary btn-sm" onclick="window.viewTimetable('${faculty.id}')" style="flex: 1;">
-              View Weekly Timetable
-            </button>
-            <button class="btn btn-primary btn-sm" onclick="window.quickCheck('${faculty.id}')">
-              Check Time
-            </button>
-          </div>
-        </div>
-      `;
-    }).join('');
+        `;
+      }).join('');
+    } catch (err) {
+      console.error('Error rendering faculty list:', err);
+    }
   }
 
-  // Handle live search and department filter
-  if (searchInput) searchInput.addEventListener('input', renderFacultyList);
-  if (departmentFilter) departmentFilter.addEventListener('change', renderFacultyList);
+  // Handle live search with debounce
+  let debounceTimeout = null;
+  if (searchInput) {
+    searchInput.addEventListener('input', () => {
+      clearTimeout(debounceTimeout);
+      debounceTimeout = setTimeout(renderFacultyList, 200);
+    });
+  }
+
+  if (departmentFilter) {
+    departmentFilter.addEventListener('change', renderFacultyList);
+  }
+
+  // Listen for changes from Admin or other tabs
+  window.addEventListener('faculty-data-changed', () => {
+    renderFacultyList();
+  });
 
   // Check Availability Button Action
   if (checkAvailabilityBtn) {
@@ -147,15 +170,18 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // Global helper to view weekly timetable modal
-  window.viewTimetable = function(facultyId) {
-    const store = window.DataStore.getStore();
-    const faculty = (store.faculty || []).find(f => f.id === facultyId);
+  window.viewTimetable = async function(facultyId) {
+    let faculty = currentLoadedFaculty.find(f => f.id === facultyId);
+    if (!faculty) {
+      faculty = await window.FacultyService.getFacultyById(facultyId);
+    }
     if (!faculty) return;
 
     if (modalFacultyName) {
       modalFacultyName.textContent = `${faculty.full_name} (${faculty.department}) - Room: ${faculty.room}`;
     }
 
+    const store = window.DataStore ? window.DataStore.getStore() : { timetables: [] };
     const timetables = (store.timetables || []).filter(t => t.faculty_id === facultyId && t.is_active !== false);
 
     // Days order
@@ -187,9 +213,11 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   // Quick check focuses on date/time inputs
-  window.quickCheck = function(facultyId) {
-    const store = window.DataStore.getStore();
-    const faculty = (store.faculty || []).find(f => f.id === facultyId);
+  window.quickCheck = async function(facultyId) {
+    let faculty = currentLoadedFaculty.find(f => f.id === facultyId);
+    if (!faculty) {
+      faculty = await window.FacultyService.getFacultyById(facultyId);
+    }
     if (!faculty) return;
     
     const targetDate = checkDateInput.value;

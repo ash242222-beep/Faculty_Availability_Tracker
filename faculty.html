@@ -43,6 +43,9 @@
         <div style="text-align: right; font-size: 0.875rem;">
           <div><strong>Cabin / Office:</strong> <span id="faculty-profile-room">Cabin 12</span></div>
           <div style="color: var(--text-muted);"><span id="faculty-profile-email">email@college.edu</span></div>
+          <button type="button" id="btn-open-edit-profile" class="btn btn-secondary btn-sm" style="margin-top: 0.5rem; font-size: 0.75rem; padding: 0.25rem 0.6rem;">
+            Edit Cabin / Designation
+          </button>
         </div>
       </div>
 
@@ -207,6 +210,36 @@
       </div>
     </div>
 
+    <!-- Edit Profile Modal -->
+    <div id="faculty-profile-modal" class="modal-overlay" style="display: none;">
+      <div class="modal-content" style="max-width: 440px;">
+        <div class="modal-header">
+          <h3>Edit Faculty Profile</h3>
+          <button id="btn-close-profile-modal" class="close-btn">✕</button>
+        </div>
+        <form id="faculty-profile-form">
+          <div class="modal-body">
+            <div class="form-group">
+              <label for="edit-profile-name">Full Name</label>
+              <input type="text" id="edit-profile-name" class="form-control" required>
+            </div>
+            <div class="form-group">
+              <label for="edit-profile-designation">Designation</label>
+              <input type="text" id="edit-profile-designation" class="form-control" placeholder="e.g. Associate Professor" required>
+            </div>
+            <div class="form-group">
+              <label for="edit-profile-room">Cabin / Office Room</label>
+              <input type="text" id="edit-profile-room" class="form-control" placeholder="e.g. Cabin 14" required>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" id="btn-cancel-profile-modal" class="btn btn-secondary btn-sm">Cancel</button>
+            <button type="submit" class="btn btn-primary btn-sm">Save Changes</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
   </main>
 
   <!-- Site Footer -->
@@ -225,6 +258,7 @@
   <script src="js/supabase-client.js"></script>
   <script src="js/utils.js"></script>
   <script src="js/auth.js"></script>
+  <script src="js/faculty-service.js"></script>
   <script src="js/faculty.js"></script>
 </body>
 </html>

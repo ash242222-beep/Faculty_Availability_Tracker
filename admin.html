@@ -64,6 +64,23 @@
           <button id="btn-open-add-faculty" class="btn btn-primary btn-sm">+ Add New Faculty</button>
         </div>
 
+        <!-- Faculty Filter & Search Bar -->
+        <div style="display: flex; flex-wrap: wrap; gap: 0.75rem; margin-bottom: 1rem; align-items: center;">
+          <div style="flex: 1; min-width: 200px;">
+            <input type="text" id="admin-faculty-search" class="form-control" placeholder="Search by name, designation, cabin, or email...">
+          </div>
+          <div style="width: 220px;">
+            <select id="admin-faculty-dept-filter" class="form-control">
+              <option value="All Departments">All Departments</option>
+              <option value="Computer Engineering">Computer Engineering</option>
+              <option value="Information Technology">Information Technology</option>
+              <option value="Electronics Engineering">Electronics Engineering</option>
+              <option value="Mechanical Engineering">Mechanical Engineering</option>
+              <option value="Civil Engineering">Civil Engineering</option>
+            </select>
+          </div>
+        </div>
+
         <div class="table-responsive">
           <table>
             <thead>
@@ -405,6 +422,7 @@
   <script src="js/supabase-client.js"></script>
   <script src="js/utils.js"></script>
   <script src="js/auth.js"></script>
+  <script src="js/faculty-service.js"></script>
   <script src="js/admin.js"></script>
   <script src="js/timetable-import.js"></script>
 </body>
