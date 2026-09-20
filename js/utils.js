@@ -53,6 +53,29 @@ function formatTime12Hour(time24) {
 }
 
 /**
+ * Calculates human-readable duration between two HH:MM times (e.g., "1 hr 30 mins")
+ */
+function calculateDuration(startTime, endTime) {
+  if (!startTime || !endTime) return '';
+  const [hA, mA] = startTime.split(':').map(Number);
+  const [hB, mB] = endTime.split(':').map(Number);
+  let totalMinutes = (hB * 60 + mB) - (hA * 60 + mA);
+  if (totalMinutes <= 0) return '0 mins';
+  const hours = Math.floor(totalMinutes / 60);
+  const mins = totalMinutes % 60;
+  if (hours > 0 && mins > 0) return `${hours} hr ${mins} mins`;
+  if (hours > 0) return `${hours} hr${hours > 1 ? 's' : ''}`;
+  return `${mins} mins`;
+}
+
+/**
+ * Checks if two time intervals [startA, endA) and [startB, endB) overlap
+ */
+function isTimeOverlap(startA, endA, startB, endB) {
+  return compareTime(startA, endB) < 0 && compareTime(endA, startB) > 0;
+}
+
+/**
  * CENTRAL REUSABLE FUNCTION:
  * getFacultyAvailability(facultyId, date, time)
  * 
@@ -212,6 +235,8 @@ window.Utils = {
   compareTime,
   isTimeBetween,
   formatTime12Hour,
+  calculateDuration,
+  isTimeOverlap,
   getFacultyAvailability,
   getStatusDisplay,
   renderStatusBadge,

@@ -399,51 +399,67 @@ Dr. Priya Mehta,Information Technology,Thursday,14:00,15:00,Academic Counseling,
 
   // 5. Confirm Final Import
   if (btnConfirmImport) {
-    btnConfirmImport.addEventListener('click', () => {
+    btnConfirmImport.addEventListener('click', async () => {
       const validRows = stagedImportRows.filter(r => r.isValid);
       if (validRows.length === 0) {
         alert('Cannot import: No valid rows present. Please correct errors or upload a valid file.');
         return;
       }
 
-      const store = window.DataStore.getStore();
-      if (!store.timetables) store.timetables = [];
+      btnConfirmImport.disabled = true;
+      btnConfirmImport.textContent = 'Importing...';
 
-      // Add each valid row to timetables
-      validRows.forEach(row => {
-        store.timetables.push({
-          id: 'imp-tt-' + Date.now() + '-' + Math.random().toString(36).substr(2, 5),
-          faculty_id: row.faculty_id,
-          day_of_week: row.day_of_week,
-          start_time: row.start_time,
-          end_time: row.end_time,
-          activity: row.activity,
-          room: row.room,
-          is_active: true
+      try {
+        let importedCount = 0;
+        if (window.TimetableService && window.TimetableService.batchImportTimetables) {
+          const res = await window.TimetableService.batchImportTimetables(validRows);
+          importedCount = res.imported;
+        } else {
+          const store = window.DataStore.getStore();
+          if (!store.timetables) store.timetables = [];
+
+          validRows.forEach(row => {
+            store.timetables.push({
+              id: 'imp-tt-' + Date.now() + '-' + Math.random().toString(36).substr(2, 5),
+              faculty_id: row.faculty_id,
+              day_of_week: row.day_of_week,
+              start_time: row.start_time,
+              end_time: row.end_time,
+              activity: row.activity,
+              room: row.room,
+              is_active: true
+            });
+          });
+          window.DataStore.saveStore(store);
+          importedCount = validRows.length;
+        }
+
+        // Record audit history entry in timetable_imports
+        const store = window.DataStore.getStore();
+        if (!store.imports) store.imports = [];
+        store.imports.unshift({
+          id: 'imp-' + Date.now(),
+          file_name: stagedFileName || 'timetable_upload.csv',
+          file_type: stagedFileType || 'csv',
+          uploaded_by: (Auth.getCurrentUser() || {}).name || 'Admin',
+          rows_detected: stagedImportRows.length,
+          rows_imported: importedCount,
+          status: (importedCount === stagedImportRows.length) ? 'success' : 'partial',
+          created_at: new Date().toISOString()
         });
-      });
+        window.DataStore.saveStore(store);
 
-      // Record audit history entry in timetable_imports
-      if (!store.imports) store.imports = [];
-      store.imports.unshift({
-        id: 'imp-' + Date.now(),
-        file_name: stagedFileName || 'timetable_upload.csv',
-        file_type: stagedFileType || 'csv',
-        uploaded_by: (Auth.getCurrentUser() || {}).name || 'Admin',
-        rows_detected: stagedImportRows.length,
-        rows_imported: validRows.length,
-        status: (validRows.length === stagedImportRows.length) ? 'success' : 'partial',
-        created_at: new Date().toISOString()
-      });
+        alert(`Successfully imported ${importedCount} timetable records into the database!`);
+        stagedImportRows = [];
+        previewSection.style.display = 'none';
 
-      window.DataStore.saveStore(store);
-
-      alert(`Successfully imported ${validRows.length} timetable records into the database!`);
-      stagedImportRows = [];
-      previewSection.style.display = 'none';
-
-      // Refresh admin tables if available
-      window.location.reload();
+        window.dispatchEvent(new CustomEvent('timetable-data-changed', { detail: { action: 'batch-import' } }));
+      } catch (err) {
+        alert('Error during import: ' + err.message);
+      } finally {
+        btnConfirmImport.disabled = false;
+        btnConfirmImport.textContent = 'Confirm & Commit Import to Database';
+      }
     });
   }
 

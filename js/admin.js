@@ -263,7 +263,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // ==========================================================
-  // SECTION 2: TIMETABLE MANAGEMENT
+  // SECTION 2: TIMETABLE MANAGEMENT (Timetable Engine & Validation)
   // ==========================================================
   const timetableTableBody = document.getElementById('timetable-admin-body');
   const timetableForm = document.getElementById('timetable-form');
@@ -271,166 +271,289 @@ document.addEventListener('DOMContentLoaded', () => {
   const btnSubmitTimetable = document.getElementById('btn-submit-timetable');
   const btnCancelTimetableEdit = document.getElementById('btn-cancel-tt-edit');
   const filterFacultySelect = document.getElementById('tt-filter-faculty');
+  const filterDaySelect = document.getElementById('tt-filter-day');
+  const ttSearchInput = document.getElementById('tt-search-input');
+  const ttCountBadge = document.getElementById('tt-count-badge');
+  const ttValidationAlert = document.getElementById('tt-validation-alert');
+  const ttDurationBadge = document.getElementById('tt-duration-badge');
+  const ttFormTitle = document.getElementById('tt-form-title');
+  const ttFacultySelect = document.getElementById('tt-faculty-select');
+  const ttDay = document.getElementById('tt-day');
+  const ttStartTime = document.getElementById('tt-start-time');
+  const ttEndTime = document.getElementById('tt-end-time');
+  const ttActivity = document.getElementById('tt-activity');
+  const ttRoom = document.getElementById('tt-room');
+  const ttIsActive = document.getElementById('tt-is-active');
 
-  function renderTimetableAdmin() {
-    const store = window.DataStore.getStore();
+  // Interactive Live Validation Check
+  function checkLiveTimetableValidation() {
+    if (!ttStartTime || !ttEndTime || !ttValidationAlert) return;
+
+    const startVal = ttStartTime.value;
+    const endVal = ttEndTime.value;
+
+    if (ttDurationBadge && startVal && endVal) {
+      const dur = window.Utils.calculateDuration(startVal, endVal);
+      ttDurationBadge.textContent = dur ? `Duration: ${dur}` : 'Invalid Window';
+    }
+
+    const payload = {
+      faculty_id: ttFacultySelect ? ttFacultySelect.value : '',
+      day_of_week: ttDay ? ttDay.value : 'Monday',
+      start_time: startVal,
+      end_time: endVal,
+      activity: ttActivity ? ttActivity.value.trim() : 'Class',
+      room: ttRoom ? ttRoom.value.trim() : '',
+      is_active: ttIsActive ? ttIsActive.checked : true
+    };
+
+    const currentEditId = timetableEditId ? timetableEditId.value : null;
+    const validation = window.TimetableService.validateTimetableEntry(payload, currentEditId);
+
+    if (!validation.isValid) {
+      ttValidationAlert.style.display = 'block';
+      ttValidationAlert.style.backgroundColor = '#fef2f2';
+      ttValidationAlert.style.color = '#991b1b';
+      ttValidationAlert.style.border = '1px solid #fecaca';
+      ttValidationAlert.innerHTML = `<strong>Validation Notice:</strong> ${validation.errors.join(' ')}`;
+    } else if (validation.warnings.length > 0) {
+      ttValidationAlert.style.display = 'block';
+      ttValidationAlert.style.backgroundColor = '#fffbeb';
+      ttValidationAlert.style.color = '#92400e';
+      ttValidationAlert.style.border = '1px solid #fde68a';
+      ttValidationAlert.innerHTML = `<strong>Advisory:</strong> ${validation.warnings.join(' ')}`;
+    } else {
+      ttValidationAlert.style.display = 'block';
+      ttValidationAlert.style.backgroundColor = '#f0fdf4';
+      ttValidationAlert.style.color = '#166534';
+      ttValidationAlert.style.border = '1px solid #bbf7d0';
+      ttValidationAlert.innerHTML = `<span>&#10003; Slot is valid and conflict-free.</span>`;
+    }
+  }
+
+  // Attach live validation listeners
+  [ttFacultySelect, ttDay, ttStartTime, ttEndTime, ttActivity, ttRoom, ttIsActive].forEach(el => {
+    if (el) {
+      el.addEventListener('input', checkLiveTimetableValidation);
+      el.addEventListener('change', checkLiveTimetableValidation);
+    }
+  });
+
+  async function renderTimetableAdmin() {
     if (!timetableTableBody) return;
 
-    const selectedFacultyFilter = filterFacultySelect ? filterFacultySelect.value : 'all';
-    let records = store.timetables || [];
+    const facultyFilter = filterFacultySelect ? filterFacultySelect.value : 'all';
+    const dayFilter = filterDaySelect ? filterDaySelect.value : 'all';
+    const searchQuery = ttSearchInput ? ttSearchInput.value.trim() : '';
 
-    if (selectedFacultyFilter !== 'all') {
-      records = records.filter(r => r.faculty_id === selectedFacultyFilter);
+    if (ttCountBadge) ttCountBadge.textContent = 'Refreshing...';
+
+    try {
+      const records = await window.TimetableService.getAllTimetables({
+        facultyId: facultyFilter,
+        dayOfWeek: dayFilter,
+        searchQuery: searchQuery
+      });
+
+      const facultyList = await window.FacultyService.getAllFaculty();
+      const facultyMap = (facultyList || []).reduce((acc, f) => {
+        acc[f.id] = f;
+        return acc;
+      }, {});
+
+      if (ttCountBadge) {
+        ttCountBadge.textContent = `${records.length} slot${records.length === 1 ? '' : 's'}`;
+      }
+
+      if (records.length === 0) {
+        timetableTableBody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: var(--text-muted); padding: 1.5rem;">No timetable entries match filter criteria.</td></tr>`;
+        return;
+      }
+
+      timetableTableBody.innerHTML = records.map(t => {
+        const fac = facultyMap[t.faculty_id];
+        const facName = fac ? fac.full_name : 'Unknown Faculty';
+        const facDept = fac ? fac.department : '';
+        const durationStr = window.Utils.calculateDuration(t.start_time, t.end_time);
+        const isActive = t.is_active !== false;
+
+        const statusBadge = isActive
+          ? `<span class="badge-status badge-available" style="font-size: 0.75rem;">Active</span>`
+          : `<span class="badge-status badge-unavailable" style="font-size: 0.75rem;">Paused</span>`;
+
+        return `
+          <tr ${!isActive ? 'style="opacity: 0.75; background: #fafafa;"' : ''}>
+            <td>
+              <strong>${facName}</strong>
+              ${facDept ? `<div style="font-size: 0.75rem; color: var(--text-muted);">${facDept}</div>` : ''}
+            </td>
+            <td><strong>${t.day_of_week}</strong></td>
+            <td>
+              <div>${window.Utils.formatTime12Hour(t.start_time)} - ${window.Utils.formatTime12Hour(t.end_time)}</div>
+              <div style="font-size: 0.75rem; color: var(--text-muted);">${durationStr}</div>
+            </td>
+            <td><strong>${t.activity}</strong></td>
+            <td>${t.room || '—'}</td>
+            <td>${statusBadge}</td>
+            <td>
+              <div style="display: flex; gap: 0.35rem; flex-wrap: wrap;">
+                <button class="btn btn-secondary btn-sm" onclick="window.editTimetableEntry('${t.id}')">Edit</button>
+                <button class="btn btn-secondary btn-sm" onclick="window.toggleTimetableActive('${t.id}', ${!isActive})">
+                  ${isActive ? 'Pause' : 'Activate'}
+                </button>
+                <button class="btn btn-danger btn-sm" onclick="window.deleteTimetableEntry('${t.id}')">Delete</button>
+              </div>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    } catch (err) {
+      console.error('Error rendering timetable admin:', err);
+      timetableTableBody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: var(--danger); padding: 1.5rem;">Failed to load timetables: ${err.message}</td></tr>`;
     }
-
-    if (records.length === 0) {
-      timetableTableBody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--text-muted); padding: 1.5rem;">No timetable entries match filter.</td></tr>`;
-      return;
-    }
-
-    const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-    records.sort((a, b) => {
-      const dDiff = days.indexOf(a.day_of_week) - days.indexOf(b.day_of_week);
-      if (dDiff !== 0) return dDiff;
-      return window.Utils.compareTime(a.start_time, b.start_time);
-    });
-
-    timetableTableBody.innerHTML = records.map(t => {
-      const faculty = (store.faculty || []).find(f => f.id === t.faculty_id);
-      const facultyName = faculty ? faculty.full_name : 'Unknown Faculty';
-
-      return `
-        <tr>
-          <td><strong>${facultyName}</strong></td>
-          <td>${t.day_of_week}</td>
-          <td>${window.Utils.formatTime12Hour(t.start_time)} - ${window.Utils.formatTime12Hour(t.end_time)}</td>
-          <td><strong>${t.activity}</strong></td>
-          <td>${t.room || '—'}</td>
-          <td>
-            <div style="display: flex; gap: 0.35rem;">
-              <button class="btn btn-secondary btn-sm" onclick="window.editTimetableEntry('${t.id}')">Edit</button>
-              <button class="btn btn-danger btn-sm" onclick="window.deleteTimetableEntry('${t.id}')">Delete</button>
-            </div>
-          </td>
-        </tr>
-      `;
-    }).join('');
   }
 
-  if (filterFacultySelect) {
-    filterFacultySelect.addEventListener('change', renderTimetableAdmin);
-  }
+  // Filter Listeners
+  if (filterFacultySelect) filterFacultySelect.addEventListener('change', renderTimetableAdmin);
+  if (filterDaySelect) filterDaySelect.addEventListener('change', renderTimetableAdmin);
+  if (ttSearchInput) ttSearchInput.addEventListener('input', debounce(renderTimetableAdmin, 250));
 
   // Timetable Form Submit
   if (timetableForm) {
-    timetableForm.addEventListener('submit', (e) => {
+    timetableForm.addEventListener('submit', async (e) => {
       e.preventDefault();
-      const store = window.DataStore.getStore();
       const editId = timetableEditId.value;
 
-      const facultyId = document.getElementById('tt-faculty-select').value;
-      const day = document.getElementById('tt-day').value;
-      const startTime = document.getElementById('tt-start-time').value;
-      const endTime = document.getElementById('tt-end-time').value;
-      const activity = document.getElementById('tt-activity').value.trim();
-      const room = document.getElementById('tt-room').value.trim();
+      const payload = {
+        faculty_id: ttFacultySelect.value,
+        day_of_week: ttDay.value,
+        start_time: ttStartTime.value,
+        end_time: ttEndTime.value,
+        activity: ttActivity.value.trim(),
+        room: ttRoom.value.trim(),
+        is_active: ttIsActive.checked
+      };
 
-      // Timetable validation: start time < end time
-      if (window.Utils.compareTime(startTime, endTime) >= 0) {
-        alert('Validation Error: End time must be strictly after start time.');
-        return;
-      }
+      btnSubmitTimetable.disabled = true;
+      btnSubmitTimetable.textContent = editId ? 'Updating...' : 'Saving...';
 
-      // Check for unintended overlapping entries for the same faculty on the same day
-      const existingFacultyEntries = (store.timetables || []).filter(t => 
-        t.faculty_id === facultyId && 
-        t.day_of_week === day && 
-        t.id !== editId &&
-        t.is_active !== false
-      );
-
-      const hasOverlap = existingFacultyEntries.some(t => {
-        return (window.Utils.compareTime(startTime, t.end_time) < 0) &&
-               (window.Utils.compareTime(endTime, t.start_time) > 0);
-      });
-
-      if (hasOverlap) {
-        alert('Validation Error: This timetable slot overlaps with another scheduled class for this faculty member.');
-        return;
-      }
-
-      if (editId) {
-        const idx = store.timetables.findIndex(t => t.id === editId);
-        if (idx >= 0) {
-          store.timetables[idx] = {
-            ...store.timetables[idx],
-            faculty_id: facultyId,
-            day_of_week: day,
-            start_time: startTime,
-            end_time: endTime,
-            activity: activity,
-            room: room
-          };
+      try {
+        let res;
+        if (editId) {
+          res = await window.TimetableService.updateTimetable(editId, payload);
+        } else {
+          res = await window.TimetableService.addTimetable(payload);
         }
-        timetableEditId.value = '';
-        btnSubmitTimetable.textContent = 'Add Timetable Record';
-        btnCancelTimetableEdit.style.display = 'none';
-      } else {
-        const newTimetable = {
-          id: 't-' + Date.now(),
-          faculty_id: facultyId,
-          day_of_week: day,
-          start_time: startTime,
-          end_time: endTime,
-          activity: activity,
-          room: room,
-          is_active: true
-        };
-        store.timetables.push(newTimetable);
-      }
 
-      window.DataStore.saveStore(store);
-      timetableForm.reset();
-      renderTimetableAdmin();
-      alert('Timetable record saved successfully.');
+        if (res.success) {
+          timetableEditId.value = '';
+          timetableForm.reset();
+          if (ttIsActive) ttIsActive.checked = true;
+          if (ttFormTitle) ttFormTitle.textContent = 'Add Timetable Record';
+          btnSubmitTimetable.textContent = 'Add Timetable Record';
+          btnCancelTimetableEdit.style.display = 'none';
+          if (ttValidationAlert) ttValidationAlert.style.display = 'none';
+
+          await renderTimetableAdmin();
+          
+          if (res.warnings && res.warnings.length > 0) {
+            alert(`Timetable record saved successfully!\n\nAdvisory: ${res.warnings.join('\n')}`);
+          } else {
+            alert(editId ? 'Timetable record updated successfully.' : 'Timetable record added successfully.');
+          }
+        } else {
+          alert('Validation / Collision Error:\n' + res.error);
+          checkLiveTimetableValidation();
+        }
+      } catch (err) {
+        alert('Error saving timetable record: ' + err.message);
+      } finally {
+        btnSubmitTimetable.disabled = false;
+        btnSubmitTimetable.textContent = editId ? 'Update Timetable Record' : 'Add Timetable Record';
+      }
     });
   }
 
-  window.editTimetableEntry = function(ttId) {
-    const store = window.DataStore.getStore();
-    const t = (store.timetables || []).find(item => item.id === ttId);
-    if (!t) return;
+  // Edit Timetable Entry
+  window.editTimetableEntry = async function(ttId) {
+    try {
+      const t = await window.TimetableService.getTimetableById(ttId);
+      if (!t) {
+        alert('Timetable record not found.');
+        return;
+      }
 
-    timetableEditId.value = t.id;
-    document.getElementById('tt-faculty-select').value = t.faculty_id;
-    document.getElementById('tt-day').value = t.day_of_week;
-    document.getElementById('tt-start-time').value = t.start_time;
-    document.getElementById('tt-end-time').value = t.end_time;
-    document.getElementById('tt-activity').value = t.activity;
-    document.getElementById('tt-room').value = t.room || '';
+      timetableEditId.value = t.id;
+      if (ttFacultySelect) ttFacultySelect.value = t.faculty_id;
+      if (ttDay) ttDay.value = t.day_of_week;
+      if (ttStartTime) ttStartTime.value = t.start_time;
+      if (ttEndTime) ttEndTime.value = t.end_time;
+      if (ttActivity) ttActivity.value = t.activity;
+      if (ttRoom) ttRoom.value = t.room || '';
+      if (ttIsActive) ttIsActive.checked = t.is_active !== false;
 
-    btnSubmitTimetable.textContent = 'Update Timetable Record';
-    btnCancelTimetableEdit.style.display = 'inline-block';
-    timetableForm.scrollIntoView({ behavior: 'smooth' });
+      if (ttFormTitle) ttFormTitle.textContent = 'Edit Timetable Record';
+      btnSubmitTimetable.textContent = 'Update Timetable Record';
+      btnCancelTimetableEdit.style.display = 'inline-block';
+      checkLiveTimetableValidation();
+      timetableForm.scrollIntoView({ behavior: 'smooth' });
+    } catch (err) {
+      alert('Error loading record: ' + err.message);
+    }
   };
 
+  // Cancel Timetable Edit
   if (btnCancelTimetableEdit) {
     btnCancelTimetableEdit.addEventListener('click', () => {
       timetableEditId.value = '';
       timetableForm.reset();
+      if (ttIsActive) ttIsActive.checked = true;
+      if (ttFormTitle) ttFormTitle.textContent = 'Add Timetable Record';
       btnSubmitTimetable.textContent = 'Add Timetable Record';
       btnCancelTimetableEdit.style.display = 'none';
+      if (ttValidationAlert) ttValidationAlert.style.display = 'none';
+      if (ttDurationBadge) ttDurationBadge.textContent = 'Duration: 1 hr';
     });
   }
 
-  window.deleteTimetableEntry = function(ttId) {
-    if (!confirm('Are you sure you want to delete this timetable record?')) return;
-    const store = window.DataStore.getStore();
-    store.timetables = (store.timetables || []).filter(t => t.id !== ttId);
-    window.DataStore.saveStore(store);
-    renderTimetableAdmin();
-    alert('Timetable record removed.');
+  // Toggle Active State
+  window.toggleTimetableActive = async function(ttId, newActiveState) {
+    const actionName = newActiveState ? 'activate' : 'pause';
+    if (!confirm(`Are you sure you want to ${actionName} this timetable slot?`)) return;
+
+    try {
+      const res = await window.TimetableService.toggleTimetableActive(ttId, newActiveState);
+      if (res.success) {
+        await renderTimetableAdmin();
+      } else {
+        alert('Error: ' + res.error);
+      }
+    } catch (err) {
+      alert('Error updating slot status: ' + err.message);
+    }
   };
+
+  // Delete Timetable Entry
+  window.deleteTimetableEntry = async function(ttId) {
+    if (!confirm('Are you sure you want to permanently delete this timetable record?')) return;
+
+    try {
+      const res = await window.TimetableService.deleteTimetable(ttId);
+      if (res.success) {
+        await renderTimetableAdmin();
+        alert('Timetable record removed.');
+      } else {
+        alert('Error: ' + res.error);
+      }
+    } catch (err) {
+      alert('Error deleting record: ' + err.message);
+    }
+  };
+
+  // Global change listener to keep timetable table updated
+  window.addEventListener('timetable-data-changed', () => {
+    renderTimetableAdmin();
+  });
 
   // ==========================================================
   // SECTION 4: AVAILABILITY & OVERRIDES MANAGEMENT

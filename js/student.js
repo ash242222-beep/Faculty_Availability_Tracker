@@ -149,6 +149,10 @@ document.addEventListener('DOMContentLoaded', () => {
     renderFacultyList();
   });
 
+  window.addEventListener('timetable-data-changed', () => {
+    renderFacultyList();
+  });
+
   // Check Availability Button Action
   if (checkAvailabilityBtn) {
     checkAvailabilityBtn.addEventListener('click', () => {
@@ -178,14 +182,25 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!faculty) return;
 
     if (modalFacultyName) {
-      modalFacultyName.textContent = `${faculty.full_name} (${faculty.department}) - Room: ${faculty.room}`;
+      modalFacultyName.textContent = `${faculty.full_name} (${faculty.department}) - Cabin: ${faculty.room}`;
     }
 
-    const store = window.DataStore ? window.DataStore.getStore() : { timetables: [] };
-    const timetables = (store.timetables || []).filter(t => t.faculty_id === facultyId && t.is_active !== false);
+    let timetables = [];
+    try {
+      if (window.TimetableService) {
+        timetables = await window.TimetableService.getTimetablesByFaculty(facultyId);
+      } else {
+        const store = window.DataStore ? window.DataStore.getStore() : { timetables: [] };
+        timetables = (store.timetables || []).filter(t => t.faculty_id === facultyId && t.is_active !== false);
+      }
+    } catch (e) {
+      console.warn('Student timetable modal fetch fallback:', e);
+      const store = window.DataStore ? window.DataStore.getStore() : { timetables: [] };
+      timetables = (store.timetables || []).filter(t => t.faculty_id === facultyId && t.is_active !== false);
+    }
 
     // Days order
-    const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
     if (modalTimetableBody) {
       if (timetables.length === 0) {
@@ -195,13 +210,16 @@ document.addEventListener('DOMContentLoaded', () => {
         timetables.sort((a, b) => {
           const dayDiff = days.indexOf(a.day_of_week) - days.indexOf(b.day_of_week);
           if (dayDiff !== 0) return dayDiff;
-          return window.Utils.compareTime(a.start_time, b.end_time);
+          return window.Utils.compareTime(a.start_time, b.start_time);
         });
 
         modalTimetableBody.innerHTML = timetables.map(item => `
           <tr>
             <td><strong>${item.day_of_week}</strong></td>
-            <td>${window.Utils.formatTime12Hour(item.start_time)} - ${window.Utils.formatTime12Hour(item.end_time)}</td>
+            <td>
+              <div>${window.Utils.formatTime12Hour(item.start_time)} - ${window.Utils.formatTime12Hour(item.end_time)}</div>
+              <div style="font-size: 0.75rem; color: var(--text-muted);">${window.Utils.calculateDuration(item.start_time, item.end_time)}</div>
+            </td>
             <td><strong>${item.activity}</strong></td>
             <td>${item.room || faculty.room}</td>
           </tr>

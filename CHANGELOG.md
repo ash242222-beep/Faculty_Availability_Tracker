@@ -7,6 +7,36 @@ and this project adheres to Semantic Versioning.
 
 ---
 
+## [v0.4.0] - 2026-09-20 - Milestone 4: Timetable Engine & Validation
+
+### Added
+- **Centralized Timetable Service Layer (`js/timetable-service.js`)**:
+  - Full CRUD operations supporting live Supabase REST table operations on `public.timetables` with seamless offline fallback to `window.DataStore`.
+  - Comprehensive multi-faceted collision engine:
+    - **Self Overlap Detection**: Blocks overlapping classes for the same faculty member on the same day (`[start, end)` time intervals).
+    - **Identical Duplicate Guard**: Identifies and prevents duplicate identical entries.
+    - **Venue / Room Collision Advisory**: Detects room scheduling conflicts when multiple faculty members are scheduled in the same room at overlapping times and returns an advisory warning.
+    - **Time Window Verification**: Strict checks for start < end time, valid 24h format (`HH:MM`), and realistic class durations (minimum 15 mins, maximum 8 hours).
+  - Time utilities in `js/utils.js`: `calculateDuration(start, end)` with human-readable string formats (e.g. "1 hr 30 mins"), and `isTimeOverlap(startA, endA, startB, endB)`.
+  - Batch import helper `batchImportTimetables(entries)` with automated validation and rollback/error reporting.
+  - Reactive global event dispatcher: emits `timetable-data-changed` CustomEvents on creations, modifications, deletions, and imports.
+- **Admin Timetable Interface Upgrade (`admin.html` & `js/admin.js`)**:
+  - Dynamic filter panel: filter timetables by Faculty member, Day of the Week, and live debounced keyword search (activity, room, faculty name).
+  - Real-time interactive validation preview: displays calculated duration pill and live conflict status banner (green checkmark for clear, red warning for overlap, orange advisory for room collisions) directly as the user types.
+  - Slot status management: 1-click **Pause / Activate** toggle allowing administrators to soft-disable timetable slots without deleting them.
+  - Duration pill in timetable list rows displaying exact duration alongside formatted 12-hour start and end times.
+- **Faculty Dashboard Integration (`faculty.html` & `js/faculty.js`)**:
+  - Today's schedule card and full weekly timetable table updated to query `TimetableService.getTimetablesByFaculty()`.
+  - Real-time reactive updates: automatically updates timetable cards when modified from admin or import without page reload via `timetable-data-changed` listener.
+  - Duration badges rendered for all weekly scheduled slots.
+- **Student Dashboard Integration (`student.html` & `js/student.js`)**:
+  - Weekly Timetable modal connects directly to `TimetableService.getTimetablesByFaculty()` with duration badges and corrected time-sorting.
+  - Auto-updates student availability calculations whenever timetable slots are modified via reactive event listener.
+- **Import Engine Integration (`js/timetable-import.js`)**:
+  - Final commit stage now utilizes `TimetableService.batchImportTimetables()` and dispatches `timetable-data-changed` event to automatically refresh all open tabs.
+
+---
+
 ## [v0.3.0] - 2026-09-20 - Milestone 3: Faculty Management
 
 ### Added

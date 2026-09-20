@@ -169,17 +169,25 @@
         </div>
 
         <!-- Add / Edit Timetable Form -->
-        <form id="timetable-form" style="background: var(--surface-muted); padding: 1.25rem; border-radius: var(--radius-sm); margin-bottom: 1.5rem;">
+        <form id="timetable-form" style="background: var(--surface-muted); padding: 1.25rem; border-radius: var(--radius-sm); margin-bottom: 1.5rem; border: 1px solid var(--border-color);">
           <input type="hidden" id="tt-edit-id" value="">
           
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+            <h3 id="tt-form-title" style="font-size: 0.95rem; font-weight: 600; margin: 0;">Add Timetable Record</h3>
+            <span id="tt-duration-badge" style="font-size: 0.75rem; background: var(--border-color); padding: 0.2rem 0.5rem; border-radius: var(--radius-sm); font-weight: 500;">Duration: 1 hr</span>
+          </div>
+
+          <!-- Live validation / collision preview box -->
+          <div id="tt-validation-alert" style="display: none; padding: 0.5rem 0.75rem; border-radius: var(--radius-sm); font-size: 0.8125rem; margin-bottom: 0.75rem;"></div>
+
           <div class="form-row">
             <div class="form-group" style="flex: 1.5;">
-              <label for="tt-faculty-select">Faculty Member</label>
+              <label for="tt-faculty-select">Faculty Member *</label>
               <select id="tt-faculty-select" class="form-control" required></select>
             </div>
 
             <div class="form-group">
-              <label for="tt-day">Day of Week</label>
+              <label for="tt-day">Day of Week *</label>
               <select id="tt-day" class="form-control">
                 <option value="Monday">Monday</option>
                 <option value="Tuesday">Tuesday</option>
@@ -187,23 +195,24 @@
                 <option value="Thursday">Thursday</option>
                 <option value="Friday">Friday</option>
                 <option value="Saturday">Saturday</option>
+                <option value="Sunday">Sunday</option>
               </select>
             </div>
 
             <div class="form-group">
-              <label for="tt-start-time">Start Time</label>
+              <label for="tt-start-time">Start Time *</label>
               <input type="time" id="tt-start-time" class="form-control" required value="09:00">
             </div>
 
             <div class="form-group">
-              <label for="tt-end-time">End Time</label>
+              <label for="tt-end-time">End Time *</label>
               <input type="time" id="tt-end-time" class="form-control" required value="10:00">
             </div>
           </div>
 
           <div class="form-row">
             <div class="form-group" style="flex: 2;">
-              <label for="tt-activity">Class / Activity Name</label>
+              <label for="tt-activity">Class / Activity Name *</label>
               <input type="text" id="tt-activity" class="form-control" placeholder="e.g. CS402 - Data Structures Lab" required>
             </div>
 
@@ -211,20 +220,43 @@
               <label for="tt-room">Classroom / Lab Venue</label>
               <input type="text" id="tt-room" class="form-control" placeholder="e.g. Lab 2">
             </div>
+
+            <div class="form-group" style="display: flex; align-items: flex-end; padding-bottom: 0.5rem;">
+              <label style="display: inline-flex; align-items: center; gap: 0.4rem; cursor: pointer; font-size: 0.85rem; margin: 0;">
+                <input type="checkbox" id="tt-is-active" checked style="cursor: pointer;">
+                <span>Active Slot</span>
+              </label>
+            </div>
           </div>
 
-          <div style="display: flex; gap: 0.75rem; justify-content: flex-end;">
+          <div style="display: flex; gap: 0.75rem; justify-content: flex-end; align-items: center; margin-top: 0.5rem;">
             <button type="button" id="btn-cancel-tt-edit" class="btn btn-secondary" style="display: none;">Cancel</button>
             <button type="submit" id="btn-submit-timetable" class="btn btn-primary">Add Timetable Record</button>
           </div>
         </form>
 
         <!-- Filter bar -->
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-          <h3 style="font-size: 1.05rem;">Scheduled Classes</h3>
+        <div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 0.75rem; margin-bottom: 1rem;">
           <div style="display: flex; align-items: center; gap: 0.5rem;">
-            <label for="tt-filter-faculty" style="margin-bottom: 0; font-size: 0.8125rem;">Filter by Faculty:</label>
-            <select id="tt-filter-faculty" class="form-control" style="width: auto; font-size: 0.8125rem; padding: 0.25rem 0.5rem;"></select>
+            <h3 style="font-size: 1.05rem; margin: 0;">Scheduled Classes</h3>
+            <span id="tt-count-badge" class="badge-status badge-available" style="font-size: 0.75rem;">Loading...</span>
+          </div>
+
+          <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem;">
+            <input type="text" id="tt-search-input" class="form-control" placeholder="Search class or room..." style="width: 170px; font-size: 0.8125rem; padding: 0.25rem 0.5rem;">
+            
+            <select id="tt-filter-day" class="form-control" style="width: auto; font-size: 0.8125rem; padding: 0.25rem 0.5rem;">
+              <option value="all">All Days</option>
+              <option value="Monday">Monday</option>
+              <option value="Tuesday">Tuesday</option>
+              <option value="Wednesday">Wednesday</option>
+              <option value="Thursday">Thursday</option>
+              <option value="Friday">Friday</option>
+              <option value="Saturday">Saturday</option>
+              <option value="Sunday">Sunday</option>
+            </select>
+
+            <select id="tt-filter-faculty" class="form-control" style="width: auto; font-size: 0.8125rem; padding: 0.25rem 0.5rem; max-width: 220px;"></select>
           </div>
         </div>
 
@@ -234,10 +266,11 @@
               <tr>
                 <th>Faculty</th>
                 <th>Day</th>
-                <th>Time Window</th>
+                <th>Time & Duration</th>
                 <th>Class / Activity</th>
                 <th>Room</th>
-                <th style="width: 140px;">Actions</th>
+                <th>Status</th>
+                <th style="width: 170px;">Actions</th>
               </tr>
             </thead>
             <tbody id="timetable-admin-body">
@@ -423,6 +456,7 @@
   <script src="js/utils.js"></script>
   <script src="js/auth.js"></script>
   <script src="js/faculty-service.js"></script>
+  <script src="js/timetable-service.js"></script>
   <script src="js/admin.js"></script>
   <script src="js/timetable-import.js"></script>
 </body>

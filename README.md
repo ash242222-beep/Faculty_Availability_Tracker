@@ -165,9 +165,9 @@ The frontend uses standard static HTML5, CSS3, and JavaScript:
 Releases follow semantic milestone versions:
 - `v0.1.0` - Static UI (Completed)
 - `v0.2.0` - Supabase Authentication (Completed)
-- `v0.3.0` - Faculty Database & Search (Current)
-- `v0.4.0` - Timetable Engine & Validation (Next)
-- `v0.5.0` - Central Availability & Overrides
+- `v0.3.0` - Faculty Database & Search (Completed)
+- `v0.4.0` - Timetable Engine & Validation (Current)
+- `v0.5.0` - Central Availability & Overrides (Next)
 - `v0.6.0` - CSV Timetable Import
 - `v0.7.0` - Text PDF Timetable Import
 - `v0.8.0` - Security Hardening & Polish
@@ -177,6 +177,6 @@ Releases follow semantic milestone versions:
 
 ## 10. Current Version Status
 
-- **Active Version**: `v0.3.0`
-- **Milestone Name**: Faculty Management (`FacultyService`, CRUD, search/filtering, active/pause state)
+- **Active Version**: `v0.4.0`
+- **Milestone Name**: Timetable Engine & Validation (`TimetableService`, overlap/room collision engine, interactive validation, filtering, duration metrics)
 - **Status**: Complete and ready for user review.

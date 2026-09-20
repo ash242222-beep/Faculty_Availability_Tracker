@@ -189,9 +189,20 @@ document.addEventListener('DOMContentLoaded', async () => {
   const todayScheduleContainer = document.getElementById('today-schedule-container');
   const weeklyTimetableBody = document.getElementById('weekly-timetable-body');
 
-  function renderTimetables() {
-    const currentStore = window.DataStore.getStore();
-    const myTimetables = (currentStore.timetables || []).filter(t => t.faculty_id === faculty.id && t.is_active !== false);
+  async function renderTimetables() {
+    let myTimetables = [];
+    try {
+      if (window.TimetableService) {
+        myTimetables = await window.TimetableService.getTimetablesByFaculty(faculty.id);
+      } else {
+        const currentStore = window.DataStore.getStore();
+        myTimetables = (currentStore.timetables || []).filter(t => t.faculty_id === faculty.id && t.is_active !== false);
+      }
+    } catch (e) {
+      console.warn('Timetable fetch notice in faculty dashboard:', e);
+      const currentStore = window.DataStore.getStore();
+      myTimetables = (currentStore.timetables || []).filter(t => t.faculty_id === faculty.id && t.is_active !== false);
+    }
 
     const todayDayName = window.Utils.getDayName(new Date().toISOString().split('T')[0]);
     const todayClasses = myTimetables.filter(t => t.day_of_week === todayDayName);
@@ -214,8 +225,13 @@ document.addEventListener('DOMContentLoaded', async () => {
                   <strong>${c.activity}</strong>
                   <div style="font-size: 0.8125rem; color: var(--text-muted);">${c.room || faculty.room}</div>
                 </div>
-                <div style="font-size: 0.875rem; font-weight: 600;">
-                  ${window.Utils.formatTime12Hour(c.start_time)} - ${window.Utils.formatTime12Hour(c.end_time)}
+                <div style="text-align: right;">
+                  <div style="font-size: 0.875rem; font-weight: 600;">
+                    ${window.Utils.formatTime12Hour(c.start_time)} - ${window.Utils.formatTime12Hour(c.end_time)}
+                  </div>
+                  <div style="font-size: 0.75rem; color: var(--text-muted);">
+                    ${window.Utils.calculateDuration(c.start_time, c.end_time)}
+                  </div>
                 </div>
               </div>
             `).join('')}
@@ -229,7 +245,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (myTimetables.length === 0) {
         weeklyTimetableBody.innerHTML = `<tr><td colspan="4" style="text-align: center; color: var(--text-muted); padding: 1.5rem;">No regular timetable registered for your account.</td></tr>`;
       } else {
-        const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+        const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
         myTimetables.sort((a, b) => {
           const dayDiff = days.indexOf(a.day_of_week) - days.indexOf(b.day_of_week);
           if (dayDiff !== 0) return dayDiff;
@@ -239,14 +255,22 @@ document.addEventListener('DOMContentLoaded', async () => {
         weeklyTimetableBody.innerHTML = myTimetables.map(t => `
           <tr>
             <td><strong>${t.day_of_week}</strong></td>
-            <td>${window.Utils.formatTime12Hour(t.start_time)} - ${window.Utils.formatTime12Hour(t.end_time)}</td>
-            <td>${t.activity}</td>
+            <td>
+              <div>${window.Utils.formatTime12Hour(t.start_time)} - ${window.Utils.formatTime12Hour(t.end_time)}</div>
+              <div style="font-size: 0.75rem; color: var(--text-muted);">${window.Utils.calculateDuration(t.start_time, t.end_time)}</div>
+            </td>
+            <td><strong>${t.activity}</strong></td>
             <td>${t.room || faculty.room}</td>
           </tr>
         `).join('');
       }
     }
   }
+
+  // Reactive listener for timetable data updates
+  window.addEventListener('timetable-data-changed', () => {
+    renderTimetables();
+  });
 
   // ==========================================================
   // SECTION 3: TEMPORARY AVAILABILITY OVERRIDES
